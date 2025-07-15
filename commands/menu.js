@@ -31,9 +31,10 @@ class MenuHandler {
 ⏱️ Tempo: 1m, 30s, 2h, etc.
 
 🕐 *HORÁRIOS PAGANTES:*
-🎰 !horarios – Enviar dica de aposta
+🎰 !horarios – Enviar dicas de apostas
 🔛 !horapg 1/0 – Ativar/desativar
 ⏰ !addhorapg 30m – Agendar próximo
+🖼️ !imagem-horarios – Definir imagem padrão
 
 🛡️ *ANTI-LINK:*
 💣 !banextremo – Ban por qualquer link

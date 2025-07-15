@@ -389,6 +389,7 @@ client.on('message_create', async (message) => {
             case 'horarios':
             case 'horapg':
             case 'addhorapg':
+            case 'imagem-horarios':
                 await horariosHandler.handle(client, message, command, args);
                 break;
 

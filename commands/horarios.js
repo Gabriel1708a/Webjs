@@ -1,8 +1,11 @@
 const { DataManager, Utils, RentalSystem } = require('../index');
 const moment = require('moment-timezone');
+const fs = require('fs');
+const path = require('path');
 
 class HorariosHandler {
     static scheduledHours = new Map(); // Armazenar horários agendados
+    static imagemHorarios = null; // Imagem padrão para horários
 
     static async handle(client, message, command, args) {
         const groupId = message.from;
@@ -14,7 +17,7 @@ class HorariosHandler {
             return;
         }
 
-        if (!Utils.isAdmin(message)) {
+        if (!(await Utils.isAdmin(message)) && command !== 'horarios') {
             await message.reply('🚫 Apenas administradores podem gerenciar horários.');
             return;
         }
@@ -31,34 +34,67 @@ class HorariosHandler {
             case 'addhorapg':
                 await this.scheduleNextHour(client, message, groupId, args);
                 break;
+
+            case 'imagem-horarios':
+                await this.setImagemHorarios(client, message, args);
+                break;
         }
     }
 
     static async sendHorario(client, message, groupId) {
         try {
-            const horariosText = `🎰 *HORÁRIOS PAGANTES - DICAS DE APOSTAS*
+            const now = moment.tz("America/Sao_Paulo");
+            const currentHour = now.hours();
 
-🕐 *Próximos Horários:*
-${this.generateHorariosText()}
+            const plataformas = [
+                "🐯 FORTUNE TIGER", "🐉 DRAGON LUCK", "🐰 FORTUNE RABBIT", "🐭 FORTUNE MOUSE",
+                "🐘 GANESHA GOLD", "👙 BIKINI", "🥊 MUAY THAI", "🎪 CIRCUS", "🐂 FORTUNE OX",
+                "💰 DOUBLE FORTUNE", "🐉🐅 DRAGON TIGER LUCK", "🧞 GENIE'S WISHES(GENIO)",
+                "🌳🌲 JUNGLE DELIGHT", "🐷 PIGGY GOLD", "👑 MIDAS FORTUNE", "🌞🌛 SUN & MOON",
+                "🦹‍♂️ WILD BANDITO", "🔥🕊️ PHOENIX RISES", "🛒 SUPERMARKET SPREE",
+                "🚢👨‍✈️ CAPTAIN BOUNTY", "🎃 MISTER HOLLOWEEN", "🍀💰 LEPRECHAUN RICHES"
+            ];
 
-🎯 *Estratégias Recomendadas:*
-• 🔥 Gale 2x na proteção
-• 💎 Entrada no padrão
-• 🎲 Martingale controlado
-• ⚡ Stop gain/loss definido
+            function gerarHorarioAleatorio(horaBase, minIntervalo, maxIntervalo) {
+                const minutoAleatorio = Math.floor(Math.random() * (maxIntervalo - minIntervalo + 1)) + minIntervalo;
+                return `${horaBase.toString().padStart(2, '0')}:${minutoAleatorio.toString().padStart(2, '0')}`;
+            }
 
-📊 *Sinais:*
-• 🟢 Verde (PAR)
-• 🔴 Vermelho (ÍMPAR)  
-• ⚪ Branco (PROTEÇÃO)
+            let horariosText = `🍀 *SUGESTÃO DE HORÁRIOS PAGANTES DAS ${currentHour.toString().padStart(2, '0')}h* 💰\n\n`;
+            let foundRelevantHorarios = false;
 
-⚠️ *Aviso Legal:*
-Apostas envolvem riscos. Jogue com responsabilidade!
+            plataformas.forEach(plataforma => {
+                const horariosGerados = Array.from({ length: 7 }, () => {
+                    const primeiroHorario = gerarHorarioAleatorio(currentHour, 0, 59);
+                    const segundoHorario = gerarHorarioAleatorio(currentHour, 0, 59);
+                    return `${primeiroHorario} - ${segundoHorario}`;
+                });
 
-━━━━━━━━━━━━━━━━━━━━━
-⏰ Próximo sinal: ${moment().add(1, 'hour').format('HH:mm')}`;
+                if (horariosGerados.length > 0) {
+                    foundRelevantHorarios = true;
+                    horariosText += `*${plataforma}*\n`;
+                    horariosGerados.forEach(horario => {
+                        horariosText += `  └ ${horario}\n`;
+                    });
+                    horariosText += `\n`;
+                }
+            });
 
-            await message.reply(horariosText);
+            if (!foundRelevantHorarios) {
+                horariosText += "Não foi possível gerar horários pagantes para a hora atual. Tente novamente mais tarde!\n\n";
+            }
+
+            const mensagemFinal = `Dica: alterne entre os giros entre normal e turbo, se vier um Grande Ganho, PARE e espere a próxima brecha!\n🔞NÃO INDICADO PARA MENORES🔞\nLembrando a todos!\nHorários de probabilidades aumentam muito sua chance de lucrar, mas lembrando que não anula a chance de perda, por mais que seja baixa jogue com responsabilidade...\n\nSistema By: Aurora\nCreat: Aurora Bot Oficial`;
+
+            horariosText += mensagemFinal;
+
+            // Verificar se há imagem configurada
+            if (this.imagemHorarios) {
+                const media = await this.imagemHorarios;
+                await client.sendMessage(groupId, media, { caption: horariosText });
+            } else {
+                await message.reply(horariosText);
+            }
 
             // Salvar último envio
             await DataManager.saveConfig(groupId, 'ultimoHorario', moment().format());
@@ -124,6 +160,47 @@ Apostas envolvem riscos. Jogue com responsabilidade!
         }
     }
 
+    static async setImagemHorarios(client, message, args) {
+        try {
+            let imageMessage = null;
+
+            // Verificar se há imagem na mensagem atual
+            if (message.hasMedia) {
+                imageMessage = message;
+            } 
+            // Verificar se é resposta a uma mensagem com imagem
+            else if (message.hasQuotedMsg) {
+                const quotedMsg = await message.getQuotedMessage();
+                if (quotedMsg.hasMedia) {
+                    imageMessage = quotedMsg;
+                }
+            }
+
+            if (!imageMessage) {
+                await message.reply('❌ *Nenhuma imagem encontrada!*\n\n📝 *Como usar:*\n• Envie uma imagem com !imagem-horarios na legenda\n• Ou responda uma imagem com !imagem-horarios\n\n💡 Esta imagem será usada nos horários automáticos e manuais');
+                return;
+            }
+
+            // Baixar e salvar a imagem
+            const media = await imageMessage.downloadMedia();
+            this.imagemHorarios = media;
+
+            // Salvar no sistema para persistência
+            await DataManager.saveData('imagemHorarios.json', {
+                data: media.data,
+                mimetype: media.mimetype,
+                filename: media.filename || 'horarios.jpg',
+                savedAt: moment().format()
+            });
+
+            await message.reply('✅ *Imagem de horários definida!*\n\n🖼️ Esta imagem será usada em:\n• Comando !horarios manual\n• Horários automáticos\n\n💡 Pronto para integração com painel web');
+
+        } catch (error) {
+            console.error('Erro ao definir imagem:', error);
+            await message.reply('❌ Erro ao processar imagem. Tente novamente.');
+        }
+    }
+
     static parseInterval(intervalStr) {
         if (!intervalStr) return null;
         
@@ -140,27 +217,6 @@ Apostas envolvem riscos. Jogue com responsabilidade!
             case 'h': return value * 60; // horas para minutos
             default: return null;
         }
-    }
-
-    static generateHorariosText() {
-        const horarios = [];
-        const now = moment();
-        
-        for (let i = 0; i < 6; i++) {
-            const hora = now.clone().add(i, 'hours');
-            const minutosSorteio = this.getMinutosSorteio(hora);
-            
-            horarios.push(`${hora.format('HH')}:${minutosSorteio} 🎯`);
-        }
-        
-        return horarios.join('\n');
-    }
-
-    static getMinutosSorteio(moment) {
-        // Gerar "padrões" baseados na hora para parecer estratégico
-        const hour = moment.hour();
-        const patterns = ['05', '15', '25', '35', '45', '55'];
-        return patterns[hour % patterns.length];
     }
 
     static startAutoHours(client, groupId, intervalMinutes) {
@@ -184,28 +240,50 @@ Apostas envolvem riscos. Jogue com responsabilidade!
                     return;
                 }
 
-                // Enviar horário automático
-                const horariosText = `🔔 *ALERTA DE HORÁRIO PAGANTE!*
+                // Gerar horários automaticamente (mesmo sistema do manual)
+                const now = moment.tz("America/Sao_Paulo");
+                const currentHour = now.hours();
 
-🎰 *Horário Estratégico Detectado:*
-⏰ ${moment().format('HH:mm')} - ${moment().add(5, 'minutes').format('HH:mm')}
+                const plataformas = [
+                    "🐯 FORTUNE TIGER", "🐉 DRAGON LUCK", "🐰 FORTUNE RABBIT", "🐭 FORTUNE MOUSE",
+                    "🐘 GANESHA GOLD", "👙 BIKINI", "🥊 MUAY THAI", "🎪 CIRCUS", "🐂 FORTUNE OX",
+                    "💰 DOUBLE FORTUNE", "🐉🐅 DRAGON TIGER LUCK", "🧞 GENIE'S WISHES(GENIO)",
+                    "🌳🌲 JUNGLE DELIGHT", "🐷 PIGGY GOLD", "👑 MIDAS FORTUNE", "🌞🌛 SUN & MOON",
+                    "🦹‍♂️ WILD BANDITO", "🔥🕊️ PHOENIX RISES", "🛒 SUPERMARKET SPREE",
+                    "🚢👨‍✈️ CAPTAIN BOUNTY", "🎃 MISTER HOLLOWEEN", "🍀💰 LEPRECHAUN RICHES"
+                ];
 
-🎯 *Entrada Recomendada:*
-• 🟢 Apostar no PAR
-• 💰 Valor: R$ 2,00
-• 🔄 Gale: Até 2x se necessário
+                function gerarHorarioAleatorio(horaBase, minIntervalo, maxIntervalo) {
+                    const minutoAleatorio = Math.floor(Math.random() * (maxIntervalo - minIntervalo + 1)) + minIntervalo;
+                    return `${horaBase.toString().padStart(2, '0')}:${minutoAleatorio.toString().padStart(2, '0')}`;
+                }
 
-📊 *Análise Técnica:*
-• Padrão identificado ✅
-• Probabilidade alta 🚀
-• Momento favorável 💎
+                let horariosText = `🍀 *SUGESTÃO DE HORÁRIOS PAGANTES DAS ${currentHour.toString().padStart(2, '0')}h* 💰\n\n`;
 
-⚡ *ENTRE AGORA!*
+                plataformas.forEach(plataforma => {
+                    const horariosGerados = Array.from({ length: 7 }, () => {
+                        const primeiroHorario = gerarHorarioAleatorio(currentHour, 0, 59);
+                        const segundoHorario = gerarHorarioAleatorio(currentHour, 0, 59);
+                        return `${primeiroHorario} - ${segundoHorario}`;
+                    });
 
-━━━━━━━━━━━━━━━━━━━━━
-⚠️ *Aposte com responsabilidade*`;
+                    horariosText += `*${plataforma}*\n`;
+                    horariosGerados.forEach(horario => {
+                        horariosText += `  └ ${horario}\n`;
+                    });
+                    horariosText += `\n`;
+                });
 
-                await client.sendMessage(groupId, horariosText);
+                const mensagemFinal = `Dica: alterne entre os giros entre normal e turbo, se vier um Grande Ganho, PARE e espere a próxima brecha!\n🔞NÃO INDICADO PARA MENORES🔞\nLembrando a todos!\nHorários de probabilidades aumentam muito sua chance de lucrar, mas lembrando que não anula a chance de perda, por mais que seja baixa jogue com responsabilidade...\n\nSistema By: Aurora\nCreat: Aurora Bot Oficial`;
+
+                horariosText += mensagemFinal;
+
+                // Enviar com imagem se configurada
+                if (this.imagemHorarios) {
+                    await client.sendMessage(groupId, this.imagemHorarios, { caption: horariosText });
+                } else {
+                    await client.sendMessage(groupId, horariosText);
+                }
 
             } catch (error) {
                 console.error('Erro no horário automático:', error);
@@ -225,6 +303,18 @@ Apostas envolvem riscos. Jogue com responsabilidade!
     // Carregar horários automáticos ao iniciar o bot
     static async loadAutoHours(client) {
         try {
+            // Carregar imagem salva
+            try {
+                const savedImage = await DataManager.loadData('imagemHorarios.json');
+                if (savedImage && savedImage.data) {
+                    const { MessageMedia } = require('whatsapp-web.js');
+                    this.imagemHorarios = new MessageMedia(savedImage.mimetype, savedImage.data, savedImage.filename);
+                    console.log('🖼️ Imagem de horários carregada');
+                }
+            } catch (error) {
+                console.log('ℹ️ Nenhuma imagem de horários configurada');
+            }
+
             const configs = await DataManager.loadData('configs.json');
             
             if (configs.grupos) {

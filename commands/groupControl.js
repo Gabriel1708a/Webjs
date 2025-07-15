@@ -175,12 +175,16 @@ class GroupControlHandler {
                         await client.sendMessage(groupId, '🔒 *Grupo fechado automaticamente!*\n\n⏰ Horário programado atingido');
                     }
                     
-                    // Reagendar para o próximo dia
-                    scheduleNext();
+                    // Pequeno delay antes de reagendar para evitar múltiplas execuções
+                    setTimeout(() => {
+                        scheduleNext();
+                    }, 5000);
                 } catch (error) {
                     console.error(`Erro ao executar ${action} automático:`, error);
-                    // Reagendar mesmo com erro
-                    scheduleNext();
+                    // Reagendar mesmo com erro após delay
+                    setTimeout(() => {
+                        scheduleNext();
+                    }, 10000);
                 }
             }, delay);
             

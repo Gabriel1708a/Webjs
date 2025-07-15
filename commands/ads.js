@@ -143,7 +143,7 @@ class AdsHandler {
         // Criar novo intervalo
         const intervalId = setInterval(async () => {
             try {
-                await client.sendMessage(groupId, `📢 *ANÚNCIO AUTOMÁTICO*\n\n${mensagem}`);
+                await client.sendMessage(groupId, mensagem);
             } catch (error) {
                 console.error('Erro ao enviar anúncio:', error);
                 // Parar intervalo em caso de erro
