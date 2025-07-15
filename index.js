@@ -322,9 +322,13 @@ async function initialize() {
         
         if (!authExists) {
             console.log('📱 Primeira execução - Será necessário pareamento');
-            
-            // Configurar listeners antes da inicialização
-            client.once('qr', (qr) => {
+        } else {
+            console.log('✅ Autenticação existente encontrada');
+        }
+        
+        // Configurar listeners para pareamento (apenas se necessário)
+        client.once('qr', (qr) => {
+            if (!authExists) {
                 console.log('⚠️ QR code gerado, tentando converter para código...');
                 // Tentar solicitar código de pareamento quando QR for gerado
                 setTimeout(async () => {
@@ -335,10 +339,20 @@ async function initialize() {
                         console.log('QR Code:', qr);
                     }
                 }, 1000);
-            });
-        } else {
-            console.log('✅ Autenticação existente encontrada');
-        }
+            } else {
+                console.log('❌ Sessão corrompida! Removendo autenticação antiga...');
+                try {
+                    const fs = require('fs-extra');
+                    fs.removeSync('./.wwebjs_auth');
+                    fs.removeSync('./.wwebjs_cache');
+                    console.log('🔄 Cache limpo. Reinicie o bot para novo pareamento.');
+                    console.log('💡 Execute: npm run test-pairing');
+                    process.exit(1);
+                } catch (error) {
+                    console.error('❌ Erro ao limpar cache:', error);
+                }
+            }
+        });
         
         // Inicializar cliente
         await client.initialize();
