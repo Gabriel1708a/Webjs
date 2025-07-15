@@ -2,6 +2,7 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs-extra');
 const moment = require('moment-timezone');
 const path = require('path');
+const chalk = require('chalk');
 
 // Importar configurações
 const config = require('./config.json');
@@ -31,6 +32,59 @@ const client = new Client({
 
 // Configurar timezone
 moment.tz.setDefault(config.timezone);
+
+// Sistema de Logs Coloridos
+class Logger {
+    static logBox(title, content, color = 'blue') {
+        const width = 50;
+        const titlePadded = ` ${title} `.padStart((width + title.length) / 2).padEnd(width);
+        
+        console.log(chalk[color]('┌' + '─'.repeat(width) + '┐'));
+        console.log(chalk[color]('│' + chalk.white.bold(titlePadded) + '│'));
+        console.log(chalk[color]('├' + '─'.repeat(width) + '┤'));
+        
+        content.forEach(line => {
+            const linePadded = ` ${line}`.padEnd(width);
+            console.log(chalk[color]('│') + chalk.white(linePadded) + chalk[color]('│'));
+        });
+        
+        console.log(chalk[color]('└' + '─'.repeat(width) + '┘'));
+        console.log('');
+    }
+
+    static success(message) {
+        console.log(chalk.green('✅'), chalk.white(message));
+    }
+
+    static error(message) {
+        console.log(chalk.red('❌'), chalk.white(message));
+    }
+
+    static info(message) {
+        console.log(chalk.blue('ℹ️ '), chalk.white(message));
+    }
+
+    static warning(message) {
+        console.log(chalk.yellow('⚠️ '), chalk.white(message));
+    }
+
+    static command(user, command, group) {
+        console.log(
+            chalk.cyan('📝') + ' ' +
+            chalk.yellow(user) + ' → ' +
+            chalk.green(command) + ' ' +
+            chalk.gray(`(${group})`)
+        );
+    }
+
+    static admin(message) {
+        console.log(chalk.magenta('👑'), chalk.white(message));
+    }
+
+    static owner(message) {
+        console.log(chalk.red('🔴'), chalk.white(message));
+    }
+}
 
 // Sistema de dados JSON
 class DataManager {
@@ -115,14 +169,53 @@ class RentalSystem {
 
 // Utilitários
 class Utils {
-    static isAdmin(message) {
-        return message.author ? message.participant?.isAdmin || message.participant?.isSuperAdmin : false;
+    static async isAdmin(message) {
+        try {
+            if (!message.author) {
+                Logger.warning('isAdmin: message.author não encontrado');
+                return false;
+            }
+
+            const chat = await message.getChat();
+            if (!chat.isGroup) {
+                Logger.info('isAdmin: Não é um grupo');
+                return false;
+            }
+
+            // Buscar participante específico
+            const participant = chat.participants.find(p => 
+                p.id._serialized === message.author
+            );
+
+            if (!participant) {
+                Logger.warning(`isAdmin: Participante não encontrado - ${message.author}`);
+                return false;
+            }
+
+            const isAdmin = participant.isAdmin || participant.isSuperAdmin;
+            
+            if (isAdmin) {
+                Logger.admin(`Admin detectado: ${message.author.replace('@c.us', '')}`);
+            }
+
+            return isAdmin;
+
+        } catch (error) {
+            Logger.error(`Erro ao verificar admin: ${error.message}`);
+            return false;
+        }
     }
 
     static isOwner(message) {
         if (!message.author) return false;
         const authorNumber = message.author.replace('@c.us', '');
-        return authorNumber === config.numeroDono;
+        const isOwner = authorNumber === config.numeroDono;
+        
+        if (isOwner) {
+            Logger.owner(`Dono detectado: ${authorNumber}`);
+        }
+        
+        return isOwner;
     }
 
     static isGroup(message) {
@@ -136,6 +229,15 @@ class Utils {
     static formatMention(contact) {
         return `@${contact.id.user}`;
     }
+
+    static getUsername(message) {
+        if (!message.author) return 'Desconhecido';
+        return message.author.replace('@c.us', '');
+    }
+
+    static getGroupName(groupId) {
+        return groupId.split('@')[0];
+    }
 }
 
 // Eventos do cliente
@@ -144,9 +246,12 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', async () => {
-    console.log('🤖 Bot conectado e pronto!');
-    console.log(`📱 Número: ${client.info.wid.user}`);
-    console.log(`📋 Nome: ${client.info.pushname}`);
+    Logger.logBox('BOT CONECTADO', [
+        `📱 Número: ${client.info.wid.user}`,
+        `📋 Nome: ${client.info.pushname}`,
+        `👑 Dono: ${config.numeroDono}`,
+        `⏰ Conectado em: ${moment().format('DD/MM/YYYY HH:mm')}`
+    ], 'green');
     
     // Importar módulos após cliente estar pronto
     welcomeHandler = require('./commands/welcome');
@@ -157,26 +262,44 @@ client.on('ready', async () => {
     groupControlHandler = require('./commands/groupControl');
     horariosHandler = require('./commands/horarios');
     
+    Logger.info('Módulos de comandos carregados');
+    
     // Carregar sistemas automáticos
     await adsHandler.loadAllAds(client);
     await groupControlHandler.loadSchedules(client);
     await horariosHandler.loadAutoHours(client);
     
+    Logger.success('Sistemas automáticos inicializados');
+    
     // Enviar notificação para o dono
     try {
         const donoId = config.numeroDono + '@c.us';
         await client.sendMessage(donoId, '🤖 *Bot Admin conectado com sucesso!*\n\n✅ Pronto para gerenciar grupos\n📅 Data: ' + moment().format('DD/MM/YYYY HH:mm'));
+        Logger.success('Notificação enviada para o dono');
     } catch (error) {
-        console.log('Erro ao notificar dono:', error);
+        Logger.error(`Erro ao notificar dono: ${error.message}`);
     }
 });
 
 client.on('auth_failure', (msg) => {
-    console.error('❌ Falha na autenticação:', msg);
+    Logger.error(`Falha na autenticação: ${msg}`);
 });
 
 client.on('disconnected', (reason) => {
-    console.log('🔌 Bot desconectado:', reason);
+    Logger.warning(`Bot desconectado: ${reason}`);
+});
+
+// Eventos adicionais para logs detalhados
+client.on('loading_screen', (percent, message) => {
+    Logger.info(`Carregando: ${percent}% - ${message}`);
+});
+
+client.on('authenticated', () => {
+    Logger.success('Autenticação realizada com sucesso');
+});
+
+client.on('change_state', (state) => {
+    Logger.info(`Status do cliente: ${state}`);
 });
 
 // Processamento de mensagens
@@ -210,6 +333,13 @@ client.on('message_create', async (message) => {
         }
     }
 
+    // Log do comando
+    Logger.command(
+        Utils.getUsername(message),
+        command,
+        Utils.getGroupName(groupId)
+    );
+
     try {
         // Processar comandos
         switch (command) {
@@ -218,7 +348,7 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'all':
-                if (!Utils.isAdmin(message)) {
+                if (!(await Utils.isAdmin(message))) {
                     await message.reply('🚫 Apenas administradores podem usar este comando.');
                     return;
                 }
@@ -230,6 +360,7 @@ client.on('message_create', async (message) => {
                 await client.sendMessage(groupId, `📣 *Atenção geral!*\n\n${mentionText}`, {
                     mentions: mentions
                 });
+                Logger.success(`Comando !all executado - ${participants.length} membros mencionados`);
                 break;
 
             case 'addads':
@@ -270,13 +401,14 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'liberargrupo':
-                if (!Utils.isOwner(message) && !Utils.isAdmin(message)) {
+                if (!Utils.isOwner(message) && !(await Utils.isAdmin(message))) {
                     await message.reply('🚫 Apenas o dono pode liberar grupos.');
                     return;
                 }
                 const days = parseInt(args) || 30;
                 await RentalSystem.liberarGrupo(groupId, days);
                 await message.reply(`✅ *Grupo liberado por ${days} dias!*\n\n📅 Válido até: ${moment().add(days, 'days').format('DD/MM/YYYY HH:mm')}`);
+                Logger.success(`Grupo ${Utils.getGroupName(groupId)} liberado por ${days} dias`);
                 break;
 
             case 'vergrupo':
@@ -289,15 +421,27 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'debugbot':
-                const debugInfo = `🔍 *DEBUG DO BOT*\n\n` +
+                const isOwner = Utils.isOwner(message);
+                const isAdmin = await Utils.isAdmin(message);
+                const chat = await message.getChat();
+                
+                const debugInfo = `🔍 *DEBUG COMPLETO DO BOT*\n\n` +
                     `👤 *Seu número:* ${message.author ? message.author.replace('@c.us', '') : 'Não detectado'}\n` +
                     `👑 *Dono configurado:* ${config.numeroDono}\n` +
-                    `✅ *É o dono?* ${Utils.isOwner(message) ? 'SIM' : 'NÃO'}\n` +
-                    `🛡️ *É admin?* ${Utils.isAdmin(message) ? 'SIM' : 'NÃO'}\n` +
-                    `🆔 *ID do grupo:* ${groupId}\n\n` +
-                    `💡 Se "É o dono?" está "NÃO", verifique o config.json`;
+                    `✅ *É o dono?* ${isOwner ? '✅ SIM' : '❌ NÃO'}\n` +
+                    `🛡️ *É admin?* ${isAdmin ? '✅ SIM' : '❌ NÃO'}\n` +
+                    `📱 *Nome do grupo:* ${chat.name}\n` +
+                    `🆔 *ID do grupo:* ${groupId}\n` +
+                    `👥 *Total de participantes:* ${chat.participants.length}\n` +
+                    `🤖 *Bot ativo:* ✅ SIM\n\n` +
+                    `💡 *Dicas:*\n` +
+                    `• Se "É o dono?" = NÃO, verifique config.json\n` +
+                    `• Se "É admin?" = NÃO, verifique se você é admin do grupo\n` +
+                    `• Use !liberargrupo 30 para ativar o grupo`;
                 
                 await message.reply(debugInfo);
+                
+                Logger.info(`Debug solicitado por ${Utils.getUsername(message)} - Dono: ${isOwner}, Admin: ${isAdmin}`);
                 break;
 
             default:
@@ -305,7 +449,7 @@ client.on('message_create', async (message) => {
                 break;
         }
     } catch (error) {
-        console.error('Erro ao processar comando:', error);
+        Logger.error(`Erro ao processar comando '${command}': ${error.message}`);
         await message.reply('❌ Erro interno do bot. Tente novamente.');
     }
 });
@@ -331,43 +475,44 @@ client.on('group_join', async (notification) => {
 
 // Inicialização SIMPLES
 async function initialize() {
-    console.log('🚀 Iniciando Bot Admin WhatsApp...');
-    console.log(`📱 Número configurado: ${config.numeroBot}`);
+    Logger.logBox('INICIANDO BOT', [
+        'Bot Administrador WhatsApp',
+        `📱 Número: ${config.numeroBot}`,
+        `⏰ ${moment().format('DD/MM/YYYY HH:mm')}`
+    ], 'cyan');
     
     try {
         // Listener único para QR/Pareamento
         client.on('qr', async (qr) => {
-            console.log('📱 Gerando código de pareamento...');
+            Logger.info('Gerando código de pareamento...');
             
             try {
                 const pairingCode = await client.requestPairingCode(config.numeroBot);
                 
-                console.log('');
-                console.log('🎉 ════════════════════════════');
-                console.log('🎉   CÓDIGO DE PAREAMENTO:');
-                console.log('🎉');
-                console.log(`🔑      ${pairingCode}`);
-                console.log('🎉');
-                console.log('🎉 ════════════════════════════');
-                console.log('');
-                console.log('📱 CONECTAR NO WHATSAPP:');
-                console.log('1. Configurações > Aparelhos conectados');
-                console.log('2. "Conectar um aparelho"');
-                console.log('3. "Usar código do telefone"');
-                console.log(`4. Digite: ${pairingCode}`);
-                console.log('');
+                Logger.logBox('CÓDIGO DE PAREAMENTO', [
+                    `🔑 Código: ${pairingCode}`,
+                    '',
+                    '📱 COMO CONECTAR:',
+                    '1. WhatsApp > Configurações',
+                    '2. Aparelhos conectados',
+                    '3. "Conectar um aparelho"',
+                    '4. "Usar código do telefone"',
+                    `5. Digite: ${pairingCode}`,
+                    '',
+                    '⏰ Código expira em alguns minutos!'
+                ], 'yellow');
                 
             } catch (error) {
-                console.log('❌ Erro ao gerar código. Sessão pode estar corrompida.');
-                console.log('🔄 Limpando cache...');
+                Logger.error('Erro ao gerar código. Sessão pode estar corrompida.');
+                Logger.warning('Limpando cache...');
                 
                 try {
                     if (fs.existsSync('./.wwebjs_auth')) fs.removeSync('./.wwebjs_auth');
                     if (fs.existsSync('./.wwebjs_cache')) fs.removeSync('./.wwebjs_cache');
-                    console.log('✅ Cache limpo. Execute novamente: npm start');
+                    Logger.success('Cache limpo. Execute novamente: npm start');
                     process.exit(1);
                 } catch (cleanError) {
-                    console.error('❌ Erro ao limpar:', cleanError);
+                    Logger.error(`Erro ao limpar: ${cleanError.message}`);
                     process.exit(1);
                 }
             }
@@ -377,7 +522,7 @@ async function initialize() {
         await client.initialize();
         
     } catch (error) {
-        console.error('❌ Erro na inicialização:', error);
+        Logger.error(`Erro na inicialização: ${error.message}`);
         process.exit(1);
     }
 }
@@ -393,7 +538,7 @@ module.exports = {
 
 // Criar estrutura básica se necessário
 if (!fs.existsSync('./data')) {
-    console.log('📁 Criando pasta data...');
+    Logger.info('Criando pasta data...');
     fs.mkdirSync('./data');
     
     const dataFiles = [
@@ -408,7 +553,7 @@ if (!fs.existsSync('./data')) {
         const filePath = `./data/${dataFile.file}`;
         if (!fs.existsSync(filePath)) {
             fs.writeFileSync(filePath, JSON.stringify(dataFile.content, null, 2));
-            console.log(`✅ Criado: ${dataFile.file}`);
+            Logger.success(`Criado: ${dataFile.file}`);
         }
     });
 }
