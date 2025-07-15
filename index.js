@@ -311,45 +311,46 @@ client.on('group_join', async (notification) => {
     }
 });
 
-// Inicialização
+// Inicialização SIMPLES
 async function initialize() {
     console.log('🚀 Iniciando Bot Admin WhatsApp...');
     console.log(`📱 Número configurado: ${config.numeroBot}`);
     
     try {
-        // Verificar se já existe autenticação
-        const authExists = fs.existsSync('./.wwebjs_auth');
-        
-        if (!authExists) {
-            console.log('📱 Primeira execução - Será necessário pareamento');
-        } else {
-            console.log('✅ Autenticação existente encontrada');
-        }
-        
-        // Configurar listeners para pareamento (apenas se necessário)
-        client.once('qr', (qr) => {
-            if (!authExists) {
-                console.log('⚠️ QR code gerado, tentando converter para código...');
-                // Tentar solicitar código de pareamento quando QR for gerado
-                setTimeout(async () => {
-                    try {
-                        await requestPairingCodeSafe();
-                    } catch (error) {
-                        console.log('❌ Falha ao gerar código, use QR como alternativa');
-                        console.log('QR Code:', qr);
-                    }
-                }, 1000);
-            } else {
-                console.log('❌ Sessão corrompida! Removendo autenticação antiga...');
+        // Listener único para QR/Pareamento
+        client.on('qr', async (qr) => {
+            console.log('📱 Gerando código de pareamento...');
+            
+            try {
+                const pairingCode = await client.requestPairingCode(config.numeroBot);
+                
+                console.log('');
+                console.log('🎉 ════════════════════════════');
+                console.log('🎉   CÓDIGO DE PAREAMENTO:');
+                console.log('🎉');
+                console.log(`🔑      ${pairingCode}`);
+                console.log('🎉');
+                console.log('🎉 ════════════════════════════');
+                console.log('');
+                console.log('📱 CONECTAR NO WHATSAPP:');
+                console.log('1. Configurações > Aparelhos conectados');
+                console.log('2. "Conectar um aparelho"');
+                console.log('3. "Usar código do telefone"');
+                console.log(`4. Digite: ${pairingCode}`);
+                console.log('');
+                
+            } catch (error) {
+                console.log('❌ Erro ao gerar código. Sessão pode estar corrompida.');
+                console.log('🔄 Limpando cache...');
+                
                 try {
-                    const fs = require('fs-extra');
-                    fs.removeSync('./.wwebjs_auth');
-                    fs.removeSync('./.wwebjs_cache');
-                    console.log('🔄 Cache limpo. Reinicie o bot para novo pareamento.');
-                    console.log('💡 Execute: npm run test-pairing');
+                    if (fs.existsSync('./.wwebjs_auth')) fs.removeSync('./.wwebjs_auth');
+                    if (fs.existsSync('./.wwebjs_cache')) fs.removeSync('./.wwebjs_cache');
+                    console.log('✅ Cache limpo. Execute novamente: npm start');
                     process.exit(1);
-                } catch (error) {
-                    console.error('❌ Erro ao limpar cache:', error);
+                } catch (cleanError) {
+                    console.error('❌ Erro ao limpar:', cleanError);
+                    process.exit(1);
                 }
             }
         });
@@ -372,71 +373,27 @@ module.exports = {
     config
 };
 
-// Verificar e criar estrutura necessária
-async function checkStructure() {
-    try {
-        // Criar pasta data se não existir
-        if (!fs.existsSync('./data')) {
-            console.log('📁 Criando pasta data...');
-            fs.mkdirSync('./data');
-            
-            // Criar arquivos JSON básicos se não existirem
-            const dataFiles = [
-                { file: 'grupoAluguel.json', content: { "grupos": {} } },
-                { file: 'configs.json', content: { "grupos": {} } },
-                { file: 'ads.json', content: { "anuncios": {} } },
-                { file: 'sorteios.json', content: { "sorteios": {} } },
-                { file: 'horarios.json', content: { "horarios": {} } }
-            ];
-            
-            for (const dataFile of dataFiles) {
-                const filePath = `./data/${dataFile.file}`;
-                if (!fs.existsSync(filePath)) {
-                    fs.writeFileSync(filePath, JSON.stringify(dataFile.content, null, 2));
-                    console.log(`✅ Criado: ${dataFile.file}`);
-                }
-            }
+// Criar estrutura básica se necessário
+if (!fs.existsSync('./data')) {
+    console.log('📁 Criando pasta data...');
+    fs.mkdirSync('./data');
+    
+    const dataFiles = [
+        { file: 'grupoAluguel.json', content: { "grupos": {} } },
+        { file: 'configs.json', content: { "grupos": {} } },
+        { file: 'ads.json', content: { "anuncios": {} } },
+        { file: 'sorteios.json', content: { "sorteios": {} } },
+        { file: 'horarios.json', content: { "horarios": {} } }
+    ];
+    
+    dataFiles.forEach(dataFile => {
+        const filePath = `./data/${dataFile.file}`;
+        if (!fs.existsSync(filePath)) {
+            fs.writeFileSync(filePath, JSON.stringify(dataFile.content, null, 2));
+            console.log(`✅ Criado: ${dataFile.file}`);
         }
-    } catch (error) {
-        console.error('❌ Erro ao verificar estrutura:', error);
-    }
+    });
 }
 
-// Função específica para pareamento
-async function requestPairingCodeSafe() {
-    try {
-        console.log('🔄 Aguardando 2 segundos antes de solicitar código...');
-        await Utils.delay(2000);
-        
-        const pairingCode = await client.requestPairingCode(config.numeroBot);
-        
-        console.log('');
-        console.log('🎉 ═══════════════════════════════════');
-        console.log('🎉   CÓDIGO DE PAREAMENTO GERADO!');
-        console.log('🎉');
-        console.log(`🔑       ${pairingCode}`);
-        console.log('🎉');
-        console.log('🎉 ═══════════════════════════════════');
-        console.log('');
-        console.log('📱 INSTRUÇÕES:');
-        console.log('1. 📱 Abra o WhatsApp no celular');
-        console.log('2. ⚙️  Configurações > Aparelhos conectados');
-        console.log('3. 🔗 "Conectar um aparelho"');
-        console.log('4. 📞 "Usar código do telefone"');
-        console.log(`5. ⌨️  Digite: ${pairingCode}`);
-        console.log('');
-        console.log('⏰ O código expira em alguns minutos!');
-        console.log('');
-        
-        return pairingCode;
-    } catch (error) {
-        console.error('❌ Erro ao solicitar código de pareamento:', error);
-        throw error;
-    }
-}
-
-// Verificar estrutura primeiro
-checkStructure().then(() => {
-    // Inicializar bot
-    initialize();
-});
+// Inicializar bot direto
+initialize();
