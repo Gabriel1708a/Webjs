@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test-pairing": "node test-pairing.js"
   },
   "dependencies": {
     "whatsapp-web.js": "^1.23.0",
