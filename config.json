@@ -1,0 +1,18 @@
+{
+  "numeroBot": "559999999999",
+  "numeroDono": "559999999999",
+  "prefix": "!",
+  "timezone": "America/Sao_Paulo",
+  "autoReconnect": true,
+  "sessaoPersistente": true,
+  "laravelApi": {
+    "enabled": false,
+    "baseUrl": "https://seu-site.com/api",
+    "token": ""
+  },
+  "botInfo": {
+    "nome": "Bot Admin",
+    "versao": "1.0.0",
+    "descricao": "Bot Administrador de Grupos WhatsApp"
+  }
+}
