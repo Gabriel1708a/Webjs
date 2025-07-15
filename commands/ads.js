@@ -28,7 +28,7 @@ class AdsHandler {
 
     static async addAd(client, message, groupId, args) {
         if (!args.includes('|')) {
-            await message.reply('❌ *Formato incorreto!*\n\n📝 Use: !addads mensagem|intervalo\n\n🔸 Exemplo: !addads Visite nosso site!|60\n🔸 Intervalo em minutos');
+            await message.reply('❌ *Formato incorreto!*\n\n📝 Use: !addads mensagem|intervalo\n\n🔸 Exemplo: !addads Visite nosso site!|60\n🔸 Intervalo em minutos\n\n📷 *Suporte a mídia:*\n• Envie imagem/vídeo com comando na legenda\n• Ou responda mídia com o comando');
             return;
         }
 
@@ -46,21 +46,47 @@ class AdsHandler {
             if (!ads.anuncios[groupId]) ads.anuncios[groupId] = {};
 
             const adId = Date.now().toString();
+            let mediaData = null;
+
+            // Verificar se há mídia
+            let mediaMessage = null;
+            if (message.hasMedia) {
+                mediaMessage = message;
+            } else if (message.hasQuotedMsg) {
+                const quotedMsg = await message.getQuotedMessage();
+                if (quotedMsg.hasMedia) {
+                    mediaMessage = quotedMsg;
+                }
+            }
+
+            // Se há mídia, baixar e salvar
+            if (mediaMessage) {
+                const media = await mediaMessage.downloadMedia();
+                mediaData = {
+                    data: media.data,
+                    mimetype: media.mimetype,
+                    filename: media.filename || `anuncio_${adId}.${media.mimetype.split('/')[1]}`
+                };
+            }
+
             const adData = {
                 id: adId,
                 mensagem: mensagem,
                 intervalo: intervalo,
                 criado: new Date().toISOString(),
-                ativo: true
+                ativo: true,
+                media: mediaData,
+                tipo: mediaData ? 'midia' : 'texto'
             };
 
             ads.anuncios[groupId][adId] = adData;
             await DataManager.saveData('ads.json', ads);
 
             // Iniciar intervalo
-            this.startAdInterval(client, groupId, adId, mensagem, intervalo);
+            this.startAdInterval(client, groupId, adId, adData);
 
-            await message.reply(`✅ *Anúncio criado!*\n\n📢 ID: ${adId}\n⏰ Intervalo: ${intervalo} minutos\n📝 Mensagem: ${mensagem.substring(0, 50)}${mensagem.length > 50 ? '...' : ''}`);
+            const tipoMidia = mediaData ? `📷 ${mediaData.mimetype.includes('video') ? 'Vídeo' : 'Imagem'}` : '📝 Texto';
+            await message.reply(`✅ *Anúncio criado!*\n\n📢 ID: ${adId}\n⏰ Intervalo: ${intervalo} minutos\n${tipoMidia}\n📝 Mensagem: ${mensagem.substring(0, 50)}${mensagem.length > 50 ? '...' : ''}`);
 
         } catch (error) {
             console.error('Erro ao criar anúncio:', error);
@@ -82,8 +108,12 @@ class AdsHandler {
 
             Object.values(groupAds).forEach(ad => {
                 if (ad.ativo) {
+                    const tipoIcon = ad.media ? (ad.media.mimetype.includes('video') ? '🎥' : '📷') : '📝';
+                    const tipoTexto = ad.media ? (ad.media.mimetype.includes('video') ? 'Vídeo' : 'Imagem') : 'Texto';
+                    
                     listText += `🆔 *ID:* ${ad.id}\n`;
                     listText += `⏰ *Intervalo:* ${ad.intervalo} min\n`;
+                    listText += `${tipoIcon} *Tipo:* ${tipoTexto}\n`;
                     listText += `📝 *Mensagem:* ${ad.mensagem.substring(0, 100)}${ad.mensagem.length > 100 ? '...' : ''}\n`;
                     listText += `━━━━━━━━━━━━━━━━━━\n\n`;
                 }
@@ -132,7 +162,7 @@ class AdsHandler {
         }
     }
 
-    static startAdInterval(client, groupId, adId, mensagem, intervalo) {
+    static startAdInterval(client, groupId, adId, adData) {
         const intervalKey = `${groupId}_${adId}`;
         
         // Parar intervalo existente se houver
@@ -143,14 +173,21 @@ class AdsHandler {
         // Criar novo intervalo
         const intervalId = setInterval(async () => {
             try {
-                await client.sendMessage(groupId, mensagem);
+                if (adData.media) {
+                    // Recriar MessageMedia para envio
+                    const { MessageMedia } = require('whatsapp-web.js');
+                    const media = new MessageMedia(adData.media.mimetype, adData.media.data, adData.media.filename);
+                    await client.sendMessage(groupId, media, { caption: adData.mensagem });
+                } else {
+                    await client.sendMessage(groupId, adData.mensagem);
+                }
             } catch (error) {
                 console.error('Erro ao enviar anúncio:', error);
                 // Parar intervalo em caso de erro
                 clearInterval(intervalId);
                 this.intervals.delete(intervalKey);
             }
-        }, intervalo * 60 * 1000);
+        }, adData.intervalo * 60 * 1000);
 
         this.intervals.set(intervalKey, intervalId);
     }
@@ -164,7 +201,7 @@ class AdsHandler {
                 Object.keys(ads.anuncios).forEach(groupId => {
                     Object.values(ads.anuncios[groupId]).forEach(ad => {
                         if (ad.ativo) {
-                            this.startAdInterval(client, groupId, ad.id, ad.mensagem, ad.intervalo);
+                            this.startAdInterval(client, groupId, ad.id, ad);
                         }
                     });
                 });

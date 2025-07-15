@@ -5,7 +5,7 @@ class MenuHandler {
         const menuText = `📋 *LISTA DE COMANDOS - BOT ADMIN*
 
 🎯 *COMANDOS GERAIS:*
-📣 !all – Menciona todos silenciosamente
+📣 !all [mensagem] – Menciona todos (sem mostrar @)
 📋 !menu – Mostra esta lista
 ✅ !vergrupo – Status do grupo
 
@@ -36,11 +36,13 @@ class MenuHandler {
 ⏰ !addhorapg 30m – Agendar próximo
 🖼️ !imagem-horarios – Definir imagem padrão
 
-🛡️ *ANTI-LINK:*
-💣 !banextremo – Ban por qualquer link
-🔗 !banlinkgp – Ban por link de grupo
-🧹 !antilinkgp – Só apagar link de grupo
-🗑️ !antilink – Só apagar qualquer link
+🛡️ *SISTEMA DE PROTEÇÃO:*
+💣 !banextremo 1/0 – Ban por qualquer link
+🔗 !banlinkgp 1/0 – Ban por link de grupo
+🧹 !antilinkgp 1/0 – Só apagar link de grupo
+🗑️ !antilink 1/0 – Só apagar qualquer link
+📷 !banfoto 1/0 – Remover fotos/vídeos
+🇧🇷 !bangringo 1/0 – Ban números estrangeiros
 🔨 !ban – Banir (responder mensagem)
 
 👑 *ADMINISTRAÇÃO:*

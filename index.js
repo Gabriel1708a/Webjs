@@ -355,9 +355,9 @@ client.on('message_create', async (message) => {
                 const chat = await message.getChat();
                 const participants = chat.participants;
                 const mentions = participants.map(p => p.id._serialized);
-                const mentionText = participants.map(p => `@${p.id.user}`).join(' ');
                 
-                await client.sendMessage(groupId, `📣 *Atenção geral!*\n\n${mentionText}`, {
+                // Mensagem sem mostrar os @ mas marcando todos
+                await client.sendMessage(groupId, `📣 *Atenção geral!*\n\n${args || 'Mensagem para todos do grupo'}`, {
                     mentions: mentions
                 });
                 Logger.success(`Comando !all executado - ${participants.length} membros mencionados`);
@@ -397,6 +397,8 @@ client.on('message_create', async (message) => {
             case 'banlinkgp':
             case 'antilinkgp':
             case 'antilink':
+            case 'banfoto':
+            case 'bangringo':
             case 'ban':
                 await banHandler.handle(client, message, command, args);
                 break;
@@ -458,19 +460,11 @@ client.on('message_create', async (message) => {
 // Processar novos membros
 client.on('group_join', async (notification) => {
     const groupId = notification.chatId;
-    const config = await DataManager.loadConfig(groupId);
+    const newMemberId = notification.id.participant;
     
-    if (config.boasVindas === 1 && config.legendaBoasVindas) {
-        const chat = await client.getChatById(groupId);
-        const newMember = await client.getContactById(notification.id.participant);
-        
-        let message = config.legendaBoasVindas
-            .replace('@user', `@${newMember.id.user}`)
-            .replace('@group', chat.name);
-            
-        await client.sendMessage(groupId, message, {
-            mentions: [newMember.id._serialized]
-        });
+    // Usar a nova função de boas-vindas com suporte a mídia
+    if (welcomeHandler) {
+        await welcomeHandler.sendWelcome(client, groupId, newMemberId);
     }
 });
 
