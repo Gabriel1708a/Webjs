@@ -423,16 +423,16 @@ client.on('message_create', async (message) => {
             case 'debugbot':
                 const isOwner = Utils.isOwner(message);
                 const isAdmin = await Utils.isAdmin(message);
-                const chat = await message.getChat();
+                const debugChat = await message.getChat();
                 
                 const debugInfo = `🔍 *DEBUG COMPLETO DO BOT*\n\n` +
                     `👤 *Seu número:* ${message.author ? message.author.replace('@c.us', '') : 'Não detectado'}\n` +
                     `👑 *Dono configurado:* ${config.numeroDono}\n` +
                     `✅ *É o dono?* ${isOwner ? '✅ SIM' : '❌ NÃO'}\n` +
                     `🛡️ *É admin?* ${isAdmin ? '✅ SIM' : '❌ NÃO'}\n` +
-                    `📱 *Nome do grupo:* ${chat.name}\n` +
+                    `📱 *Nome do grupo:* ${debugChat.name}\n` +
                     `🆔 *ID do grupo:* ${groupId}\n` +
-                    `👥 *Total de participantes:* ${chat.participants.length}\n` +
+                    `👥 *Total de participantes:* ${debugChat.participants.length}\n` +
                     `🤖 *Bot ativo:* ✅ SIM\n\n` +
                     `💡 *Dicas:*\n` +
                     `• Se "É o dono?" = NÃO, verifique config.json\n` +
