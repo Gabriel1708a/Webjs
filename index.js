@@ -119,6 +119,12 @@ class Utils {
         return message.author ? message.participant?.isAdmin || message.participant?.isSuperAdmin : false;
     }
 
+    static isOwner(message) {
+        if (!message.author) return false;
+        const authorNumber = message.author.replace('@c.us', '');
+        return authorNumber === config.numeroDono;
+    }
+
     static isGroup(message) {
         return message.from.includes('@g.us');
     }
@@ -264,7 +270,7 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'liberargrupo':
-                if (message.from !== config.numeroDono + '@c.us' && !Utils.isAdmin(message)) {
+                if (!Utils.isOwner(message) && !Utils.isAdmin(message)) {
                     await message.reply('🚫 Apenas o dono pode liberar grupos.');
                     return;
                 }
@@ -280,6 +286,18 @@ client.on('message_create', async (message) => {
                 } else {
                     await message.reply(status.message);
                 }
+                break;
+
+            case 'debugbot':
+                const debugInfo = `🔍 *DEBUG DO BOT*\n\n` +
+                    `👤 *Seu número:* ${message.author ? message.author.replace('@c.us', '') : 'Não detectado'}\n` +
+                    `👑 *Dono configurado:* ${config.numeroDono}\n` +
+                    `✅ *É o dono?* ${Utils.isOwner(message) ? 'SIM' : 'NÃO'}\n` +
+                    `🛡️ *É admin?* ${Utils.isAdmin(message) ? 'SIM' : 'NÃO'}\n` +
+                    `🆔 *ID do grupo:* ${groupId}\n\n` +
+                    `💡 Se "É o dono?" está "NÃO", verifique o config.json`;
+                
+                await message.reply(debugInfo);
                 break;
 
             default:
