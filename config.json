@@ -14,5 +14,6 @@
     "nome": "Bot Admin",
     "versao": "1.0.0",
     "descricao": "Bot Administrador de Grupos WhatsApp"
-  }
+  },
+  "groqApiKey": "SUA_CHAVE_GROQ_AQUI"
 }

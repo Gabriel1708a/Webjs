@@ -10,6 +10,12 @@ class MenuHandler {
 📋 !menu – Mostra esta lista
 ✅ !vergrupo – Status do grupo
 
+🎮 *COMANDOS INTERATIVOS:*
+🍀 !sorte – Verificar sua sorte do dia
+💡 !conselhos – Receber conselho motivacional
+🎰 !horarios – Enviar dicas de apostas
+📋 !menu – Mostra esta lista
+
 🗞️ *ANÚNCIOS:*
 📢 !addads mensagem|intervalo – Criar anúncio
 📋 !listads – Listar anúncios
@@ -32,7 +38,6 @@ class MenuHandler {
 ⏱️ Tempo: 1m, 30s, 2h, etc.
 
 🕐 *HORÁRIOS PAGANTES:*
-🎰 !horarios – Enviar dicas de apostas
 🔛 !horapg 1/0 – Ativar/desativar
 ⏰ !addhorapg 30m – Agendar próximo
 🖼️ !imagem-horarios – Definir imagem padrão
@@ -46,12 +51,22 @@ class MenuHandler {
 🇧🇷 !bangringo 1/0 – Ban números estrangeiros
 🔨 !ban – Banir (responder mensagem)
 
+🔒 *CONTROLE DE ACESSO:*
+👑 !soadm 1/0 – Modo só admin (comandos interativos)
+🔓 Quando ativado, apenas admins usam comandos interativos
+
 👑 *ADMINISTRAÇÃO:*
 🔓 !liberargrupo 30 – Liberar grupo X dias
 ⏰ !vergrupo – Ver status do grupo
 
+🔄 *ATUALIZAÇÃO (APENAS DONO):*
+🚀 !updatebot – Atualizar bot automaticamente
+🔄 !atualizar – Alias para !updatebot
+
 ━━━━━━━━━━━━━━━━━━━━━
 🤖 *Bot Admin v1.0*
+🔒 Sistema de segurança aprimorado
+🔄 Sistema de atualização automática
 ✨ Gerencie seu grupo com facilidade!`;
 
         await message.reply(menuText);

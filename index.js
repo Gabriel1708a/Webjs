@@ -344,7 +344,162 @@ client.on('message_create', async (message) => {
         // Processar comandos
         switch (command) {
             case 'menu':
+                // Verificar modo SOADM para comando interativo
+                const soadmStatusMenu = await DataManager.loadConfig(groupId, 'soadm');
+                const isOwnerMenu = Utils.isOwner(message);
+                const isAdminMenu = await Utils.isAdmin(message);
+                
+                if ((soadmStatusMenu === '1' || soadmStatusMenu === 1) && !isAdminMenu && !isOwnerMenu) {
+                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
+                    return;
+                }
+                
                 await menuHandler.handle(client, message, args);
+                break;
+
+            case 'soadm':
+                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
+                    await message.reply('🚫 Apenas administradores podem usar este comando.');
+                    return;
+                }
+                
+                const statusSoadm = parseInt(args);
+                if (statusSoadm === 1) {
+                    await DataManager.saveConfig(groupId, 'soadm', '1');
+                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos\n📝 Comandos afetados: !horarios, !sorte, !conselhos, !menu');
+                } else if (statusSoadm === 0) {
+                    await DataManager.saveConfig(groupId, 'soadm', '0');
+                    await message.reply('🔓 *Modo SOADM desativado!*\n\n👥 Todos os membros podem usar comandos interativos');
+                } else {
+                    await message.reply('❌ Use: !soadm 1 (ativar) ou !soadm 0 (desativar)');
+                }
+                break;
+
+            case 'sorte':
+                // Verificar modo SOADM
+                const soadmStatus = await DataManager.loadConfig(groupId, 'soadm');
+                const isOwnerSorte = Utils.isOwner(message);
+                const isAdminSorte = await Utils.isAdmin(message);
+                
+                if ((soadmStatus === '1' || soadmStatus === 1) && !isAdminSorte && !isOwnerSorte) {
+                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
+                    return;
+                }
+                
+                const sorte = Math.floor(Math.random() * 101);     
+                let mensagem;
+                if (sorte >= 80) {
+                    mensagem = `🍀 Uau! Sua sorte hoje está ótima! Você tem **${sorte}%** de sorte! 🍀`;
+                } else if (sorte >= 50) {
+                    mensagem = `🍀 Sua sorte está boa! Você tem **${sorte}%** de sorte hoje! 🍀`;
+                } else if (sorte >= 20) {
+                    mensagem = `🍀 Sua sorte está razoável! Você tem **${sorte}%** de sorte, mas pode melhorar! 🍀`;
+                } else {
+                    mensagem = `🍀 Hmm, a sorte não está ao seu lado hoje... Apenas **${sorte}%** de sorte. Não desista! 🍀`;
+                }
+                await message.reply(mensagem);
+                break;
+
+            case 'conselhos':
+            case 'conselho':
+                // Verificar modo SOADM
+                const soadmStatusConselho = await DataManager.loadConfig(groupId, 'soadm');
+                const isOwnerConselho = Utils.isOwner(message);
+                const isAdminConselho = await Utils.isAdmin(message);
+                
+                if ((soadmStatusConselho === '1' || soadmStatusConselho === 1) && !isAdminConselho && !isOwnerConselho) {
+                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
+                    return;
+                }
+                
+                try {
+                    // Usar variável de ambiente ou chave do config
+                    const apiKey = process.env.GROQ_API_KEY || config.groqApiKey || 'SUA_CHAVE_GROQ_AQUI';
+                    
+                    if (apiKey === 'SUA_CHAVE_GROQ_AQUI') {
+                        await message.reply('⚠️ *Comando não configurado!*\n\nConfigure a chave da API Groq no config.json:\n```\n"groqApiKey": "sua_chave_aqui"\n```');
+                        break;
+                    }
+                    
+                    const apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
+
+                    const requestBody = {
+                        model: 'llama3-8b-8192',
+                        messages: [{
+                            role: 'user',
+                            content: 'Dê-me um conselho motivacional curto e inspirador para o meu dia. mas quero só o conselho e não use inicias como "aqui esta um conselho"'
+                        }]
+                    };
+
+                    const response = await axios.post(apiUrl, requestBody, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`,
+                        },
+                    });
+
+                    const conselho = response.data.choices[0].message.content;
+                    await message.reply(`💡 *Conselho do dia:*\n\n${conselho}`);
+                } catch (error) {
+                    Logger.error(`Erro ao buscar conselho: ${error.message}`);
+                    await message.reply('❌ Erro ao buscar conselho. Tente novamente mais tarde.');
+                }
+                break;
+
+            case 'updatebot':
+            case 'atualizar':
+                if (!Utils.isOwner(message)) {
+                    await message.reply('🚫 Apenas o dono pode atualizar o bot.');
+                    return;
+                }
+                
+                await message.reply('🔄 *Iniciando atualização do bot...*\n\n⏳ Verificando atualizações...');
+                
+                try {
+                    const { execSync } = require('child_process');
+                    
+                    // Verificar se há atualizações
+                    execSync('git fetch origin', { stdio: 'pipe' });
+                    const status = execSync('git status -uno', { encoding: 'utf8' });
+                    
+                    if (status.includes('Your branch is up to date')) {
+                        await message.reply('✅ *Bot já está atualizado!*\n\n🎉 Você está usando a versão mais recente.');
+                        return;
+                    }
+                    
+                    // Fazer backup das configurações
+                    const backupTime = Date.now();
+                    await message.reply('💾 *Fazendo backup das configurações...*');
+                    
+                    // Fazer pull das atualizações
+                    await message.reply('📥 *Baixando atualizações...*');
+                    execSync('git stash', { stdio: 'pipe' });
+                    execSync('git pull origin main', { stdio: 'pipe' });
+                    
+                    // Instalar dependências
+                    await message.reply('📦 *Instalando dependências...*');
+                    execSync('npm install', { stdio: 'pipe' });
+                    
+                    // Restaurar stash
+                    try {
+                        execSync('git stash pop', { stdio: 'pipe' });
+                    } catch (error) {
+                        // Ignorar erro se não há stash
+                    }
+                    
+                    await message.reply(`✅ *Bot atualizado com sucesso!*\n\n🔄 *Reiniciando em 5 segundos...*\n💾 Backup salvo: ${backupTime}`);
+                    
+                    Logger.success(`Bot atualizado por ${Utils.getUsername(message)}`);
+                    
+                    // Reiniciar o bot
+                    setTimeout(() => {
+                        process.exit(0);
+                    }, 5000);
+                    
+                } catch (error) {
+                    Logger.error(`Erro na atualização: ${error.message}`);
+                    await message.reply('❌ *Erro na atualização!*\n\n🔧 Use o script manual:\n• `node update.js`\n• `npm run update`');
+                }
                 break;
 
             case 'all':
@@ -478,6 +633,19 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'horarios':
+                // Verificar modo SOADM para comando interativo
+                const soadmStatusHorarios = await DataManager.loadConfig(groupId, 'soadm');
+                const isOwnerHorarios = Utils.isOwner(message);
+                const isAdminHorarios = await Utils.isAdmin(message);
+                
+                if ((soadmStatusHorarios === '1' || soadmStatusHorarios === 1) && !isAdminHorarios && !isOwnerHorarios) {
+                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
+                    return;
+                }
+                
+                await horariosHandler.handle(client, message, command, args);
+                break;
+                
             case 'horapg':
             case 'addhorapg':
             case 'imagem-horarios':
