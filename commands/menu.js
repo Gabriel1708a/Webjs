@@ -55,14 +55,6 @@ class MenuHandler {
 👑 !soadm 1/0 – Modo só admin (comandos interativos)
 🔓 Quando ativado, apenas admins usam comandos interativos
 
-👑 *ADMINISTRAÇÃO:*
-🔓 !liberargrupo 30 – Liberar grupo X dias
-⏰ !vergrupo – Ver status do grupo
-
-🔄 *ATUALIZAÇÃO (APENAS DONO):*
-🚀 !updatebot – Atualizar bot automaticamente
-🔄 !atualizar – Alias para !updatebot
-
 ━━━━━━━━━━━━━━━━━━━━━
 🤖 *Bot Admin v1.0*
 🔒 Sistema de segurança aprimorado
