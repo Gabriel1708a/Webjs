@@ -5,7 +5,8 @@ class MenuHandler {
         const menuText = `📋 *LISTA DE COMANDOS - BOT ADMIN*
 
 🎯 *COMANDOS GERAIS:*
-📣 !all [mensagem] – Menciona todos (sem mostrar @)
+📣 !all [mensagem] – Salva/envia mensagem para todos
+📤 !allg – Reposta mensagem mencionada para todos  
 📋 !menu – Mostra esta lista
 ✅ !vergrupo – Status do grupo
 

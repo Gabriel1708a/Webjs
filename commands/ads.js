@@ -44,8 +44,12 @@ class AdsHandler {
             const ads = await DataManager.loadData('ads.json');
             if (!ads.anuncios) ads.anuncios = {};
             if (!ads.anuncios[groupId]) ads.anuncios[groupId] = {};
+            if (!ads.counters) ads.counters = {};
+            if (!ads.counters[groupId]) ads.counters[groupId] = 0;
 
-            const adId = Date.now().toString();
+            // Incrementar contador sequencial para este grupo
+            ads.counters[groupId]++;
+            const adId = ads.counters[groupId].toString();
             let mediaData = null;
 
             // Verificar se há mídia

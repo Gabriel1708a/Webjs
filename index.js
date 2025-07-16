@@ -352,15 +352,106 @@ client.on('message_create', async (message) => {
                     await message.reply('🚫 Apenas administradores podem usar este comando.');
                     return;
                 }
+                
                 const chat = await message.getChat();
                 const participants = chat.participants;
                 const mentions = participants.map(p => p.id._serialized);
                 
-                // Mensagem sem mostrar os @ mas marcando todos
-                await client.sendMessage(groupId, `📣 *Atenção geral!*\n\n${args || 'Mensagem para todos do grupo'}`, {
-                    mentions: mentions
-                });
-                Logger.success(`Comando !all executado - ${participants.length} membros mencionados`);
+                // Se tem argumentos, salvar a mensagem
+                if (args) {
+                    let mediaData = null;
+                    
+                    // Verificar se há mídia
+                    let mediaMessage = null;
+                    if (message.hasMedia) {
+                        mediaMessage = message;
+                    } else if (message.hasQuotedMsg) {
+                        const quotedMsg = await message.getQuotedMessage();
+                        if (quotedMsg.hasMedia) {
+                            mediaMessage = quotedMsg;
+                        }
+                    }
+
+                    // Se há mídia, baixar e salvar
+                    if (mediaMessage) {
+                        const media = await mediaMessage.downloadMedia();
+                        mediaData = {
+                            data: media.data,
+                            mimetype: media.mimetype,
+                            filename: media.filename || `all_message.${media.mimetype.split('/')[1]}`
+                        };
+                    }
+                    
+                    // Salvar mensagem !all
+                    await DataManager.saveConfig(groupId, 'allMessage', {
+                        text: args,
+                        media: mediaData,
+                        savedAt: new Date().toISOString()
+                    });
+                    
+                    await message.reply('✅ Mensagem do !all salva com sucesso!');
+                } else {
+                    // Buscar mensagem salva
+                    const savedMessage = await DataManager.loadConfig(groupId, 'allMessage');
+                    
+                    if (savedMessage && savedMessage.text) {
+                        if (savedMessage.media) {
+                            // Enviar com mídia
+                            const media = new MessageMedia(
+                                savedMessage.media.mimetype,
+                                savedMessage.media.data,
+                                savedMessage.media.filename
+                            );
+                            await client.sendMessage(groupId, media, {
+                                caption: savedMessage.text,
+                                mentions: mentions
+                            });
+                        } else {
+                            // Enviar só texto
+                            await client.sendMessage(groupId, savedMessage.text, {
+                                mentions: mentions
+                            });
+                        }
+                        Logger.success(`Comando !all executado - ${participants.length} membros mencionados`);
+                    } else {
+                        await message.reply('❌ Nenhuma mensagem salva. Use: !all [sua mensagem]');
+                    }
+                }
+                break;
+
+            case 'allg':
+                if (!(await Utils.isAdmin(message))) {
+                    await message.reply('🚫 Apenas administradores podem usar este comando.');
+                    return;
+                }
+                
+                if (!message.hasQuotedMsg) {
+                    await message.reply('❌ Você precisa responder a uma mensagem para usar o !allg');
+                    return;
+                }
+                
+                const quotedMessage = await message.getQuotedMessage();
+                const chat2 = await message.getChat();
+                const participants2 = chat2.participants;
+                const mentions2 = participants2.map(p => p.id._serialized);
+                
+                if (quotedMessage.hasMedia) {
+                    // Mensagem com mídia
+                    const media = await quotedMessage.downloadMedia();
+                    const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
+                    
+                    await client.sendMessage(groupId, messageMedia, {
+                        caption: quotedMessage.body || '',
+                        mentions: mentions2
+                    });
+                } else {
+                    // Mensagem de texto
+                    await client.sendMessage(groupId, quotedMessage.body, {
+                        mentions: mentions2
+                    });
+                }
+                
+                Logger.success(`Comando !allg executado - mensagem repostada para ${participants2.length} membros`);
                 break;
 
             case 'addads':
