@@ -7,7 +7,9 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test-pairing": "node test-pairing.js",
-    "clean": "node clean-auth.js"
+    "clean": "node clean-auth.js",
+    "update": "node update.js",
+    "atualizar": "node update.js"
   },
   "dependencies": {
     "axios": "^1.6.0",
