@@ -3,6 +3,7 @@ const fs = require('fs-extra');
 const moment = require('moment-timezone');
 const path = require('path');
 const chalk = require('chalk');
+const axios = require('axios');
 
 // Importar configurações
 const config = require('./config.json');
