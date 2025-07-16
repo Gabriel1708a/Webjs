@@ -84,6 +84,10 @@ class Logger {
     static owner(message) {
         console.log(chalk.red('🔴'), chalk.white(message));
     }
+
+    static security(message) {
+        console.log(chalk.red('🔒'), chalk.white(message));
+    }
 }
 
 // Sistema de dados JSON
@@ -333,6 +337,25 @@ client.on('message_create', async (message) => {
         }
     }
 
+    // VERIFICAÇÃO DE SEGURANÇA CENTRALIZADA
+    const adminOnlyCommands = [
+        'all', 'allg', 'ban', 'banextremo', 'banlinkgp', 'antilinkgp', 'antilink', 
+        'banfoto', 'bangringo', 'addads', 'rmads', 'listads', 'bv', 'legendabv', 
+        'abrirgrupo', 'fechargrupo', 'abrirgp', 'fechargp', 'afgp', 'soadm', 
+        'horapg', 'addhorapg', 'imagem-horarios', 'sorteio', 'updatebot', 'atualizar'
+    ];
+
+    if (adminOnlyCommands.includes(command)) {
+        const isOwner = Utils.isOwner(message);
+        const isAdmin = await Utils.isAdmin(message);
+        
+        if (!isOwner && !isAdmin) {
+            Logger.security(`ACESSO NEGADO: ${Utils.getUsername(message)} tentou usar comando administrativo: ${command}`);
+            await message.reply('🚫 *ACESSO NEGADO!*\n\n🔒 Este comando é exclusivo para administradores do grupo.');
+            return;
+        }
+    }
+
     // Log do comando
     Logger.command(
         Utils.getUsername(message),
@@ -503,7 +526,7 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'all':
-                if (!(await Utils.isAdmin(message))) {
+                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
                     await message.reply('🚫 Apenas administradores podem usar este comando.');
                     return;
                 }
@@ -575,7 +598,7 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'allg':
-                if (!(await Utils.isAdmin(message))) {
+                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
                     await message.reply('🚫 Apenas administradores podem usar este comando.');
                     return;
                 }
@@ -663,7 +686,7 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'liberargrupo':
-                if (!Utils.isOwner(message) && !(await Utils.isAdmin(message))) {
+                if (!Utils.isOwner(message)) {
                     await message.reply('🚫 Apenas o dono pode liberar grupos.');
                     return;
                 }

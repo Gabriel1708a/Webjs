@@ -4,7 +4,7 @@ class BanHandler {
     static async handle(client, message, command, args) {
         const groupId = message.from;
 
-        if (!Utils.isAdmin(message)) {
+        if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
             await message.reply('🚫 Apenas administradores podem usar comandos de moderação.');
             return;
         }

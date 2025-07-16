@@ -5,7 +5,7 @@ class SorteioHandler {
     static async handle(client, message, args) {
         const groupId = message.from;
 
-        if (!Utils.isAdmin(message)) {
+        if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
             await message.reply('🚫 Apenas administradores podem criar sorteios.');
             return;
         }
