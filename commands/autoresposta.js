@@ -47,8 +47,13 @@ class AutoRespostaHandler {
 
         try {
             const quotedMsg = await message.getQuotedMessage();
+            
+            // Apagar a mensagem que foi respondida
             await quotedMsg.delete(true); // true para deletar para todos
-            // Removido: await message.reply('✅ *Mensagem apagada com sucesso!*');
+            
+            // Apagar também a mensagem do comando !apagar
+            await message.delete(true);
+            
         } catch (error) {
             console.error('Erro ao apagar mensagem:', error);
             await message.reply('❌ Erro ao apagar mensagem. Verifique se sou administrador.');
@@ -185,7 +190,7 @@ class AutoRespostaHandler {
             console.log('🤖 Consultando API Groq para gerar frase...');
 
             const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-                model: 'llama-3.1-70b-versatile',
+                model: 'llama-3.3-70b-versatile',
                 messages: [
                     {
                         role: 'user',
