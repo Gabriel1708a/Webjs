@@ -1,11 +1,10 @@
-const { DataManager, Utils, RentalSystem } = require('../index');
+const { DataManager, Utils } = require('../index');
 const moment = require('moment-timezone');
 const fs = require('fs');
 const path = require('path');
 
 class HorariosHandler {
-    static scheduledHours = new Map(); // Armazenar horários agendados
-    static imagemHorarios = null; // Imagem padrão para horários
+    static activeIntervals = new Map(); // Para controlar intervalos ativos
 
     static async handle(client, message, command, args) {
         const groupId = message.from;
@@ -36,7 +35,7 @@ class HorariosHandler {
                 break;
 
             case 'imagem-horarios':
-                await this.setImagemHorarios(client, message, args);
+                await this.setImagemHorarios(client, message, groupId, args);
                 break;
         }
     }
@@ -88,11 +87,19 @@ class HorariosHandler {
 
             horariosText += mensagemFinal;
 
-            // Verificar se há imagem configurada
-            if (this.imagemHorarios) {
-                const media = await this.imagemHorarios;
-                await client.sendMessage(groupId, media, { caption: horariosText });
-            } else {
+            // Verificar se há imagem configurada PARA ESTE GRUPO
+            try {
+                const savedImage = await DataManager.loadConfig(groupId, 'imagemHorarios');
+                if (savedImage && savedImage.data) {
+                    const { MessageMedia } = require('whatsapp-web.js');
+                    const imagemGrupo = new MessageMedia(savedImage.mimetype, savedImage.data, savedImage.filename);
+                    await client.sendMessage(groupId, imagemGrupo, { caption: horariosText });
+                } else {
+                    // Se não há imagem para este grupo, envia só o texto
+                    await message.reply(horariosText);
+                }
+            } catch (error) {
+                // Se houver erro ao carregar imagem, envia só o texto
                 await message.reply(horariosText);
             }
 
@@ -160,7 +167,7 @@ class HorariosHandler {
         }
     }
 
-    static async setImagemHorarios(client, message, args) {
+    static async setImagemHorarios(client, message, groupId, args) {
         try {
             let imageMessage = null;
 
@@ -177,23 +184,22 @@ class HorariosHandler {
             }
 
             if (!imageMessage) {
-                await message.reply('❌ *Nenhuma imagem encontrada!*\n\n📝 *Como usar:*\n• Envie uma imagem com !imagem-horarios na legenda\n• Ou responda uma imagem com !imagem-horarios\n\n💡 Esta imagem será usada nos horários automáticos e manuais');
+                await message.reply('❌ *Nenhuma imagem encontrada!*\n\n📝 *Como usar:*\n• Envie uma imagem com !imagem-horarios na legenda\n• Ou responda uma imagem com !imagem-horarios\n\n💡 Esta imagem será usada nos horários automáticos e manuais APENAS NESTE GRUPO');
                 return;
             }
 
             // Baixar e salvar a imagem
             const media = await imageMessage.downloadMedia();
-            this.imagemHorarios = media;
 
-            // Salvar no sistema para persistência
-            await DataManager.saveData('imagemHorarios.json', {
+            // Salvar no sistema para persistência POR GRUPO
+            await DataManager.saveConfig(groupId, 'imagemHorarios', {
                 data: media.data,
                 mimetype: media.mimetype,
                 filename: media.filename || 'horarios.jpg',
                 savedAt: moment().format()
             });
 
-            await message.reply('✅ *Imagem de horários definida!*\n\n🖼️ Esta imagem será usada em:\n• Comando !horarios manual\n• Horários automáticos\n\n💡 Pronto para integração com painel web');
+            await message.reply('✅ *Imagem de horários definida para este grupo!*\n\n🖼️ Esta imagem será usada em:\n• Comando !horarios manual\n• Horários automáticos\n\n📌 *Importante:* A imagem é específica para este grupo');
 
         } catch (error) {
             console.error('Erro ao definir imagem:', error);
@@ -278,10 +284,19 @@ class HorariosHandler {
 
                 horariosText += mensagemFinal;
 
-                // Enviar com imagem se configurada
-                if (this.imagemHorarios) {
-                    await client.sendMessage(groupId, this.imagemHorarios, { caption: horariosText });
-                } else {
+                // Enviar com imagem se configurada PARA ESTE GRUPO
+                try {
+                    const savedImage = await DataManager.loadConfig(groupId, 'imagemHorarios');
+                    if (savedImage && savedImage.data) {
+                        const { MessageMedia } = require('whatsapp-web.js');
+                        const imagemGrupo = new MessageMedia(savedImage.mimetype, savedImage.data, savedImage.filename);
+                        await client.sendMessage(groupId, imagemGrupo, { caption: horariosText });
+                    } else {
+                        // Se não há imagem para este grupo, envia só o texto
+                        await client.sendMessage(groupId, horariosText);
+                    }
+                } catch (error) {
+                    // Se houver erro ao carregar imagem, envia só o texto
                     await client.sendMessage(groupId, horariosText);
                 }
 
@@ -290,44 +305,36 @@ class HorariosHandler {
             }
         }, intervalMinutes * 60 * 1000);
 
-        this.scheduledHours.set(groupId, intervalId);
+        this.activeIntervals.set(groupId, intervalId);
     }
 
     static stopAutoHours(groupId) {
-        if (this.scheduledHours.has(groupId)) {
-            clearInterval(this.scheduledHours.get(groupId));
-            this.scheduledHours.delete(groupId);
+        if (this.activeIntervals.has(groupId)) {
+            clearInterval(this.activeIntervals.get(groupId));
+            this.activeIntervals.delete(groupId);
         }
     }
 
     // Carregar horários automáticos ao iniciar o bot
     static async loadAutoHours(client) {
         try {
-            // Carregar imagem salva
-            try {
-                const savedImage = await DataManager.loadData('imagemHorarios.json');
-                if (savedImage && savedImage.data) {
-                    const { MessageMedia } = require('whatsapp-web.js');
-                    this.imagemHorarios = new MessageMedia(savedImage.mimetype, savedImage.data, savedImage.filename);
-                    console.log('🖼️ Imagem de horários carregada');
-                }
-            } catch (error) {
-                console.log('ℹ️ Nenhuma imagem de horários configurada');
-            }
+            // Não precisamos mais carregar imagem global - cada grupo terá sua própria imagem
+            console.log('🎰 Carregando horários automáticos...');
 
             const configs = await DataManager.loadData('configs.json');
             
-            if (configs.grupos) {
+            if (configs && configs.grupos) {
                 Object.keys(configs.grupos).forEach(groupId => {
                     const groupConfig = configs.grupos[groupId];
                     
                     if (groupConfig.horariosAtivos === 1 && groupConfig.intervaloHorarios) {
                         this.startAutoHours(client, groupId, groupConfig.intervaloHorarios);
+                        console.log(`🎰 Horários automáticos ativados para grupo: ${groupId}`);
                     }
                 });
             }
 
-            console.log('🎰 Horários automáticos carregados');
+            console.log('✅ Horários automáticos carregados');
         } catch (error) {
             console.error('Erro ao carregar horários automáticos:', error);
         }
