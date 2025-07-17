@@ -38,7 +38,6 @@ class MenuHandler {
 🔛 !autoresposta 1/0 – Ativar/desativar IA
 🤖 Responde a: bom dia, boa tarde, boa noite
 💬 Responde quando chamam o nome do bot
-🧠 Powered by Grok AI
 
 🎉 *SORTEIOS:*
 🎁 !sorteio prêmio|tempo – Criar sorteio
