@@ -48,7 +48,7 @@ class AutoRespostaHandler {
         try {
             const quotedMsg = await message.getQuotedMessage();
             await quotedMsg.delete(true); // true para deletar para todos
-            await message.reply('✅ *Mensagem apagada com sucesso!*');
+            // Removido: await message.reply('✅ *Mensagem apagada com sucesso!*');
         } catch (error) {
             console.error('Erro ao apagar mensagem:', error);
             await message.reply('❌ Erro ao apagar mensagem. Verifique se sou administrador.');
@@ -108,9 +108,33 @@ class AutoRespostaHandler {
         } catch (error) {
             // Fallback para respostas padrão se Grok falhar
             const respostaspadrao = {
-                'dia': ['🌅 Bom dia! Que seu dia seja repleto de conquistas! ✨', '☀️ Bom dia! A vida sorri para quem sorri primeiro! 😊'],
-                'tarde': ['🌞 Boa tarde! Continue brilhando como o sol! ⭐', '🌤️ Boa tarde! Que a energia positiva te acompanhe! 💪'],
-                'noite': ['🌙 Boa noite! Descanse e recarregue suas energias! ✨', '🌟 Boa noite! Sonhe alto e conquiste amanhã! 💫']
+                'dia': [
+                    '🌅 Bom dia! Que seu dia seja repleto de conquistas! ✨', 
+                    '☀️ Bom dia! A vida sorri para quem sorri primeiro! 😊',
+                    '🌞 Bom dia! Comece hoje com energia positiva! 💪',
+                    '🌻 Bom dia! Que este dia traga muita alegria! 🎉',
+                    '🌈 Bom dia! Novos desafios, novas oportunidades! 🚀',
+                    '⭐ Bom dia! Você é capaz de coisas incríveis! 💖',
+                    '🌸 Bom dia! Desperte com gratidão no coração! 🙏'
+                ],
+                'tarde': [
+                    '🌞 Boa tarde! Continue brilhando como o sol! ⭐', 
+                    '🌤️ Boa tarde! Que a energia positiva te acompanhe! 💪',
+                    '🌺 Boa tarde! Mantenha o foco nos seus sonhos! 🎯',
+                    '🌟 Boa tarde! Você está indo muito bem! 👏',
+                    '🌼 Boa tarde! Cada passo te leva mais longe! 🏃‍♀️',
+                    '💫 Boa tarde! Sua determinação é inspiradora! 🔥',
+                    '🌷 Boa tarde! Continue sendo essa pessoa incrível! 😍'
+                ],
+                'noite': [
+                    '🌙 Boa noite! Descanse e recarregue suas energias! ✨', 
+                    '🌟 Boa noite! Sonhe alto e conquiste amanhã! 💫',
+                    '🌃 Boa noite! Você merece um descanso merecido! 😴',
+                    '🌛 Boa noite! Que seus sonhos sejam doces! 💤',
+                    '⭐ Boa noite! Amanhã será um dia ainda melhor! 🌅',
+                    '🌜 Boa noite! Gratidão por mais um dia vivido! 🙏',
+                    '💤 Boa noite! Durma bem, guerreiro(a)! 💪'
+                ]
             };
             
             let periodo = 'dia';
@@ -119,6 +143,7 @@ class AutoRespostaHandler {
             
             const respostas = respostaspadrao[periodo];
             const resposta = respostas[Math.floor(Math.random() * respostas.length)];
+            console.log(`🔄 Usando resposta padrão (${periodo}):`, resposta);
             await message.reply(resposta);
         }
     }
@@ -153,16 +178,31 @@ class AutoRespostaHandler {
     static async gerarFraseMotivadora(periodo) {
         try {
             if (!config.groqApiKey || config.groqApiKey === 'SUA_CHAVE_GROQ_AQUI') {
+                console.log('🔧 API Groq não configurada, usando respostas padrão');
                 throw new Error('API Key não configurada');
             }
 
-            const prompt = `Gere uma frase motivadora curta e positiva para ${periodo === 'dia' ? 'bom dia' : periodo === 'tarde' ? 'boa tarde' : 'boa noite'}. 
-            A frase deve:
-            - Ser motivadora e positiva
-            - Ter entre 10-30 palavras
-            - Incluir emojis apropriados
+            // Adicionar randomização no prompt para mais variação
+            const randomElements = [
+                'energética e inspiradora',
+                'carinhosa e motivadora', 
+                'alegre e positiva',
+                'calorosa e encorajadora',
+                'afetuosa e animadora'
+            ];
+            
+            const randomTone = randomElements[Math.floor(Math.random() * randomElements.length)];
+            const randomNumber = Math.floor(Math.random() * 1000); // Para evitar cache
+
+            const prompt = `Gere uma frase ${randomTone} para ${periodo === 'dia' ? 'bom dia' : periodo === 'tarde' ? 'boa tarde' : 'boa noite'}. 
+            Requisitos:
+            - Entre 10-25 palavras
+            - Emojis apropriados 
+            - Tom ${randomTone}
             - Terminar com "bom ${periodo === 'dia' ? 'dia' : periodo === 'tarde' ? 'tarde' : 'noite'}!"
-            - Ser calorosa e amigável`;
+            - Ser única e criativa (${randomNumber})`;
+
+            console.log('🤖 Consultando API Groq para gerar frase...');
 
             const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
                 model: 'mixtral-8x7b-32768',
@@ -172,19 +212,25 @@ class AutoRespostaHandler {
                         content: prompt
                     }
                 ],
-                max_tokens: 100,
-                temperature: 0.8
+                max_tokens: 120,
+                temperature: 0.9, // Aumentei para mais criatividade
+                top_p: 0.9,
+                presence_penalty: 0.6, // Evita repetições
+                frequency_penalty: 0.5
             }, {
                 headers: {
                     'Authorization': `Bearer ${config.groqApiKey}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                timeout: 10000 // 10 segundos timeout
             });
 
-            return response.data.choices[0].message.content.trim();
+            const fraseGerada = response.data.choices[0].message.content.trim();
+            console.log('✅ Frase gerada pela API Groq:', fraseGerada);
+            return fraseGerada;
 
         } catch (error) {
-            console.error('Erro ao gerar frase motivadora:', error);
+            console.error('❌ Erro API Groq:', error.message);
             throw error;
         }
     }
