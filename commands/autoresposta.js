@@ -48,15 +48,23 @@ class AutoRespostaHandler {
         try {
             const quotedMsg = await message.getQuotedMessage();
             
-            // Apagar apenas a mensagem que foi respondida
-            await quotedMsg.delete(true); // true para deletar para todos
+            // Verificar se é uma mensagem do próprio bot
+            const contact = await quotedMsg.getContact();
+            if (contact.isMe) {
+                // Se for mensagem do bot, só apagar sem confirmação
+                await quotedMsg.delete(true);
+                return;
+            }
             
-            // Confirmar que a mensagem foi apagada
+            // Apagar mensagem de outros usuários
+            await quotedMsg.delete(true);
+            
+            // Confirmar apenas para mensagens de outros usuários
             await message.reply('✅ Mensagem apagada com sucesso!');
             
         } catch (error) {
             console.error('Erro ao apagar mensagem:', error);
-            await message.reply('❌ Erro ao apagar mensagem. Verifique se sou administrador.');
+            await message.reply('❌ Erro ao apagar mensagem. Verifique se sou administrador e se a mensagem ainda existe.');
         }
     }
 
@@ -190,21 +198,18 @@ class AutoRespostaHandler {
             console.log('🤖 Consultando API Groq para gerar frase...');
 
             const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-                model: 'llama-3.1-70b-versatile',
+                model: 'llama3-8b-8192',
                 messages: [
                     {
                         role: 'user',
                         content: `Gere uma frase motivadora para ${periodo === 'dia' ? 'bom dia' : periodo === 'tarde' ? 'boa tarde' : 'boa noite'}. A frase deve ser calorosa, positiva, ter emojis e terminar com "${periodo === 'dia' ? 'bom dia' : periodo === 'tarde' ? 'boa tarde' : 'boa noite'}!". Seja criativo e único.`
                     }
-                ],
-                max_tokens: 100,
-                temperature: 0.7
+                ]
             }, {
                 headers: {
                     'Authorization': `Bearer ${config.groqApiKey}`,
                     'Content-Type': 'application/json'
-                },
-                timeout: 15000
+                }
             });
 
             const fraseGerada = response.data.choices[0].message.content.trim();
