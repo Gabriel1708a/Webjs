@@ -321,7 +321,7 @@ client.on('ready', async () => {
     menuHandler = require('./commands/menu');
     groupControlHandler = require('./commands/groupControl');
     horariosHandler = require('./commands/horarios');
-    autoRespostaHandler = require('./commands/autoResposta');
+    autoRespostaHandler = require('./commands/autoresposta');
     
     Logger.info('Módulos de comandos carregados');
     
