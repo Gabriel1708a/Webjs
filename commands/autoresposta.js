@@ -64,7 +64,7 @@ class AutoRespostaHandler {
             if (autoRespostaAtiva !== 1) return;
 
             const texto = message.body.toLowerCase().trim();
-            const nomeBot = config.nomeBot.toLowerCase();
+            const nomeBot = config.botInfo.nome.toLowerCase();
 
             // Verificar cumprimentos
             if (this.isCumprimento(texto)) {
@@ -152,7 +152,7 @@ class AutoRespostaHandler {
 
     static async gerarFraseMotivadora(periodo) {
         try {
-            if (!config.grokApiKey || config.grokApiKey === 'SUA_CHAVE_GROK_AQUI') {
+            if (!config.groqApiKey || config.groqApiKey === 'SUA_CHAVE_GROQ_AQUI') {
                 throw new Error('API Key não configurada');
             }
 
@@ -176,7 +176,7 @@ class AutoRespostaHandler {
                 temperature: 0.8
             }, {
                 headers: {
-                    'Authorization': `Bearer ${config.grokApiKey}`,
+                    'Authorization': `Bearer ${config.groqApiKey}`,
                     'Content-Type': 'application/json'
                 }
             });
