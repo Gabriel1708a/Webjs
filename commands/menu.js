@@ -34,6 +34,12 @@ class MenuHandler {
 ⏰ !fechargp HH:MM – Agendar fechamento
 🚫 !afgp 0 – Cancelar agendamentos
 
+🤖 *AUTO-RESPOSTA IA:*
+🔛 !autoresposta 1/0 – Ativar/desativar IA
+🤖 Responde a: bom dia, boa tarde, boa noite
+💬 Responde quando chamam o nome do bot
+🧠 Powered by Grok AI
+
 🎉 *SORTEIOS:*
 🎁 !sorteio prêmio|tempo – Criar sorteio
 ⏱️ Tempo: 1m, 30s, 2h, etc.
@@ -51,6 +57,7 @@ class MenuHandler {
 📷 !banfoto 1/0 – Remover fotos/vídeos
 🇧🇷 !bangringo 1/0 – Ban números estrangeiros
 🔨 !ban – Banir (responder mensagem)
+🗑️ !apagar – Apagar mensagem (responder)
 
 🔒 *CONTROLE DE ACESSO:*
 👑 !soadm 1/0 – Modo só admin (comandos interativos)

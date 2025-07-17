@@ -15,5 +15,7 @@
     "versao": "1.0.0",
     "descricao": "Bot Administrador de Grupos WhatsApp"
   },
-  "groqApiKey": "SUA_CHAVE_GROQ_AQUI"
+  "groqApiKey": "SUA_CHAVE_GROQ_AQUI",
+  "nomeBot": "Aurora",
+  "grokApiKey": "SUA_CHAVE_GROK_AQUI"
 }

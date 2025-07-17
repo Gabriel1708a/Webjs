@@ -9,7 +9,7 @@ const axios = require('axios');
 const config = require('./config.json');
 
 // Importar módulos de comandos (será feito após definir as classes)
-let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupControlHandler, horariosHandler;
+let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupControlHandler, horariosHandler, autoRespostaHandler;
 
 // Configurar cliente WhatsApp
 const client = new Client({
@@ -321,6 +321,7 @@ client.on('ready', async () => {
     menuHandler = require('./commands/menu');
     groupControlHandler = require('./commands/groupControl');
     horariosHandler = require('./commands/horarios');
+    autoRespostaHandler = require('./commands/autoResposta');
     
     Logger.info('Módulos de comandos carregados');
     
@@ -383,7 +384,13 @@ client.on('message_create', async (message) => {
     }
     
     // Verificar se é um comando
-    if (!text.startsWith(config.prefix)) return;
+    if (!text.startsWith(config.prefix)) {
+        // Verificar autoresposta para mensagens que não são comandos
+        if (autoRespostaHandler) {
+            await autoRespostaHandler.checkAutoResposta(client, message);
+        }
+        return;
+    }
 
     const command = text.slice(config.prefix.length).split(' ')[0].toLowerCase();
     const args = text.slice(config.prefix.length + command.length).trim();
@@ -402,7 +409,8 @@ client.on('message_create', async (message) => {
         'all', 'allg', 'allg2', 'ban', 'banextremo', 'banlinkgp', 'antilinkgp', 'antilink', 
         'banfoto', 'bangringo', 'addads', 'rmads', 'listads', 'bv', 'legendabv', 
         'abrirgrupo', 'fechargrupo', 'abrirgp', 'fechargp', 'afgp', 'soadm', 
-        'horapg', 'addhorapg', 'imagem-horarios', 'sorteio', 'updatebot', 'atualizar'
+        'horapg', 'addhorapg', 'imagem-horarios', 'sorteio', 'updatebot', 'atualizar',
+        'apagar', 'autoresposta'
     ];
 
     if (adminOnlyCommands.includes(command)) {
@@ -784,6 +792,11 @@ client.on('message_create', async (message) => {
                 }
                 
                 await horariosHandler.handle(client, message, command, args);
+                break;
+
+            case 'apagar':
+            case 'autoresposta':
+                await autoRespostaHandler.handle(client, message, command, args);
                 break;
                 
             case 'horapg':
