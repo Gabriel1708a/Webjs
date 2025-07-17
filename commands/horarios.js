@@ -1,4 +1,4 @@
-const { DataManager, Utils } = require('../index');
+const { DataManager, Utils, RentalSystem } = require('../index');
 const moment = require('moment-timezone');
 const fs = require('fs');
 const path = require('path');
