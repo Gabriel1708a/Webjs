@@ -182,47 +182,24 @@ class AutoRespostaHandler {
                 throw new Error('API Key não configurada');
             }
 
-            // Adicionar randomização no prompt para mais variação
-            const randomElements = [
-                'energética e inspiradora',
-                'carinhosa e motivadora', 
-                'alegre e positiva',
-                'calorosa e encorajadora',
-                'afetuosa e animadora'
-            ];
-            
-            const randomTone = randomElements[Math.floor(Math.random() * randomElements.length)];
-            const randomNumber = Math.floor(Math.random() * 1000); // Para evitar cache
-
-            const prompt = `Gere uma frase ${randomTone} para ${periodo === 'dia' ? 'bom dia' : periodo === 'tarde' ? 'boa tarde' : 'boa noite'}. 
-            Requisitos:
-            - Entre 10-25 palavras
-            - Emojis apropriados 
-            - Tom ${randomTone}
-            - Terminar com "bom ${periodo === 'dia' ? 'dia' : periodo === 'tarde' ? 'tarde' : 'noite'}!"
-            - Ser única e criativa (${randomNumber})`;
-
             console.log('🤖 Consultando API Groq para gerar frase...');
 
             const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-                model: 'mixtral-8x7b-32768',
+                model: 'llama-3.1-70b-versatile',
                 messages: [
                     {
                         role: 'user',
-                        content: prompt
+                        content: `Gere uma frase motivadora para ${periodo === 'dia' ? 'bom dia' : periodo === 'tarde' ? 'boa tarde' : 'boa noite'}. A frase deve ser calorosa, positiva, ter emojis e terminar com "${periodo === 'dia' ? 'bom dia' : periodo === 'tarde' ? 'boa tarde' : 'boa noite'}!". Seja criativo e único.`
                     }
                 ],
-                max_tokens: 120,
-                temperature: 0.9, // Aumentei para mais criatividade
-                top_p: 0.9,
-                presence_penalty: 0.6, // Evita repetições
-                frequency_penalty: 0.5
+                max_tokens: 100,
+                temperature: 0.9
             }, {
                 headers: {
                     'Authorization': `Bearer ${config.groqApiKey}`,
                     'Content-Type': 'application/json'
                 },
-                timeout: 10000 // 10 segundos timeout
+                timeout: 10000
             });
 
             const fraseGerada = response.data.choices[0].message.content.trim();
