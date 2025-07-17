@@ -7,6 +7,7 @@ class MenuHandler {
 🎯 *COMANDOS GERAIS:*
 📣 !all [mensagem] – Salva/envia mensagem para todos
 📤 !allg – Reposta mensagem mencionada para todos  
+📌 !allg2 – Igual !allg + mostra @ todos + fixa mensagem
 📋 !menu – Mostra esta lista
 ✅ !vergrupo – Status do grupo
 

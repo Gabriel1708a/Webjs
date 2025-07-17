@@ -91,6 +91,61 @@ class Logger {
     }
 }
 
+// Sistema de controle de mensagem de bot no PV
+let notifiedUsers = new Set();
+
+// Função para carregar usuários já notificados
+async function loadNotifiedUsers() {
+    try {
+        const filePath = path.join(__dirname, 'data', 'notifiedUsers.json');
+        if (await fs.pathExists(filePath)) {
+            const data = await fs.readJSON(filePath);
+            notifiedUsers = new Set(data);
+        }
+    } catch (error) {
+        Logger.error(`Erro ao carregar usuários notificados: ${error.message}`);
+    }
+}
+
+// Função para salvar usuários notificados
+async function saveNotifiedUsers() {
+    try {
+        const filePath = path.join(__dirname, 'data', 'notifiedUsers.json');
+        await fs.ensureDir(path.dirname(filePath));
+        await fs.writeJSON(filePath, Array.from(notifiedUsers));
+    } catch (error) {
+        Logger.error(`Erro ao salvar usuários notificados: ${error.message}`);
+    }
+}
+
+// Função para lidar com mensagens privadas
+async function handlePrivateMessage(client, message) {
+    const userId = message.from;
+    
+    // Verificar se já enviamos mensagem de bot para este usuário
+    if (!notifiedUsers.has(userId)) {
+        const botMessage = `🔹 Olá! Sou um *ROBÔ* automatizado para administração de grupos no WhatsApp.
+
+> *O que é um robô?*
+> Robô é algo que não é manuseado por humano e sim por computadores , e eu sou isso
+
+⚠️ Não sou responsável por nenhuma ação tomada no grupo, apenas obedeço comandos programados para auxiliar na moderação.
+
+📌 Se precisar de suporte ou resolver alguma questão, entre em contato com um administrador do grupo.
+
+🔹 Obrigado pela compreensão!`;
+
+        try {
+            await client.sendMessage(userId, botMessage);
+            notifiedUsers.add(userId);
+            await saveNotifiedUsers();
+            Logger.info(`Mensagem de bot enviada para usuário: ${userId}`);
+        } catch (error) {
+            Logger.error(`Erro ao enviar mensagem de bot para PV: ${error.message}`);
+        }
+    }
+}
+
 // Sistema de dados JSON
 class DataManager {
     static async loadData(file) {
@@ -273,6 +328,7 @@ client.on('ready', async () => {
     await adsHandler.loadAllAds(client);
     await groupControlHandler.loadSchedules(client);
     await horariosHandler.loadAutoHours(client);
+    await loadNotifiedUsers(); // Carregar usuários já notificados
     
     Logger.success('Sistemas automáticos inicializados');
     
@@ -312,8 +368,11 @@ client.on('message_create', async (message) => {
     // Ignorar mensagens do próprio bot
     if (message.fromMe) return;
 
-    // Processar apenas grupos
-    if (!Utils.isGroup(message)) return;
+    // Verificar se é mensagem no PV (privado)
+    if (!Utils.isGroup(message)) {
+        await handlePrivateMessage(client, message);
+        return;
+    }
 
     const groupId = message.from;
     const text = message.body.trim();
@@ -340,7 +399,7 @@ client.on('message_create', async (message) => {
 
     // VERIFICAÇÃO DE SEGURANÇA CENTRALIZADA
     const adminOnlyCommands = [
-        'all', 'allg', 'ban', 'banextremo', 'banlinkgp', 'antilinkgp', 'antilink', 
+        'all', 'allg', 'allg2', 'ban', 'banextremo', 'banlinkgp', 'antilinkgp', 'antilink', 
         'banfoto', 'bangringo', 'addads', 'rmads', 'listads', 'bv', 'legendabv', 
         'abrirgrupo', 'fechargrupo', 'abrirgp', 'fechargp', 'afgp', 'soadm', 
         'horapg', 'addhorapg', 'imagem-horarios', 'sorteio', 'updatebot', 'atualizar'
@@ -631,6 +690,63 @@ client.on('message_create', async (message) => {
                 }
                 
                 Logger.success(`Comando !allg executado - mensagem repostada para ${participants2.length} membros`);
+                break;
+
+            case 'allg2':
+                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
+                    await message.reply('🚫 Apenas administradores podem usar este comando.');
+                    return;
+                }
+                
+                if (!message.hasQuotedMsg) {
+                    await message.reply('❌ Você precisa responder a uma mensagem para usar o !allg2');
+                    return;
+                }
+                
+                try {
+                    const quotedMessage2 = await message.getQuotedMessage();
+                    const chat3 = await message.getChat();
+                    const participants3 = chat3.participants;
+                    const mentions3 = participants3.map(p => p.id._serialized);
+                    
+                    // Criar lista de @ menções
+                    const mentionsList = participants3.map(p => `@${p.id.user}`).join(' ');
+                    
+                    let finalMessage = '';
+                    
+                    if (quotedMessage2.hasMedia) {
+                        // Mensagem com mídia
+                        const media2 = await quotedMessage2.downloadMedia();
+                        const messageMedia2 = new MessageMedia(media2.mimetype, media2.data, media2.filename);
+                        
+                        finalMessage = `${quotedMessage2.body || ''}\n\n${mentionsList}\n\n📊 *${participants3.length} membros mencionados*`;
+                        
+                        const sentMessage = await client.sendMessage(groupId, messageMedia2, {
+                            caption: finalMessage,
+                            mentions: mentions3
+                        });
+                        
+                        // Fixar a mensagem
+                        await sentMessage.pin();
+                        
+                    } else {
+                        // Mensagem de texto
+                        finalMessage = `${quotedMessage2.body}\n\n${mentionsList}\n\n📊 *${participants3.length} membros mencionados*`;
+                        
+                        const sentMessage = await client.sendMessage(groupId, finalMessage, {
+                            mentions: mentions3
+                        });
+                        
+                        // Fixar a mensagem
+                        await sentMessage.pin();
+                    }
+                    
+                    Logger.success(`Comando !allg2 executado - ${participants3.length} membros mencionados e mensagem fixada`);
+                    
+                } catch (error) {
+                    Logger.error(`Erro no comando !allg2: ${error.message}`);
+                    await message.reply('❌ Erro ao executar comando !allg2. Verifique se sou administrador.');
+                }
                 break;
 
             case 'addads':

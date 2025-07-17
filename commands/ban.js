@@ -98,10 +98,17 @@ class BanHandler {
                     const quotedMsg = await message.getQuotedMessage();
                     const targetUser = quotedMsg.author || quotedMsg.from;
                     
+                    // Deletar a mensagem antes de banir
+                    try {
+                        await quotedMsg.delete(true); // true para deletar para todos
+                    } catch (deleteError) {
+                        console.log('Erro ao deletar mensagem:', deleteError.message);
+                    }
+                    
                     const chat = await message.getChat();
                     await chat.removeParticipants([targetUser]);
                     
-                    await message.reply('🔨 *Usuário banido com sucesso!*');
+                    await message.reply('🔨 *Usuário banido com sucesso!*\n📝 Mensagem deletada');
                 } catch (error) {
                     await message.reply('❌ Erro ao banir usuário. Verifique se sou administrador.');
                 }
