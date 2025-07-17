@@ -677,7 +677,7 @@ client.on('message_create', async (message) => {
                     const mentions2 = participants2.map(p => p.id._serialized);
                     
                     // Verificar se tem mensagem personalizada (args após o comando)
-                    const mensagemPersonalizada = args.join(' ').trim();
+                    const mensagemPersonalizada = Array.isArray(args) ? args.join(' ').trim() : (args || '').toString().trim();
                     
                     if (mensagemPersonalizada) {
                         // Se tem mensagem personalizada, enviar ela marcando todos
