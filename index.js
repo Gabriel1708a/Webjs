@@ -666,47 +666,52 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'allg':
-                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
-                    await message.reply('🚫 Apenas administradores podem usar este comando.');
-                    return;
-                }
-                
-                const chat2 = await message.getChat();
-                const participants2 = chat2.participants;
-                const mentions2 = participants2.map(p => p.id._serialized);
-                
-                // Verificar se tem mensagem personalizada (args após o comando)
-                const mensagemPersonalizada = args.join(' ').trim();
-                
-                if (mensagemPersonalizada) {
-                    // Se tem mensagem personalizada, enviar ela marcando todos
-                    await client.sendMessage(groupId, mensagemPersonalizada, {
-                        mentions: mentions2
-                    });
-                    Logger.success(`Comando !allg executado - mensagem personalizada enviada para ${participants2.length} membros`);
-                } else if (message.hasQuotedMsg) {
-                    // Se não tem mensagem personalizada mas tem mensagem citada, usar o método antigo
-                    const quotedMessage = await message.getQuotedMessage();
-                    
-                    if (quotedMessage.hasMedia) {
-                        // Mensagem com mídia
-                        const media = await quotedMessage.downloadMedia();
-                        const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
-                        
-                        await client.sendMessage(groupId, messageMedia, {
-                            caption: quotedMessage.body || '',
-                            mentions: mentions2
-                        });
-                    } else {
-                        // Mensagem de texto
-                        await client.sendMessage(groupId, quotedMessage.body, {
-                            mentions: mentions2
-                        });
+                try {
+                    if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
+                        await message.reply('🚫 Apenas administradores podem usar este comando.');
+                        return;
                     }
-                    Logger.success(`Comando !allg executado - mensagem repostada para ${participants2.length} membros`);
-                } else {
-                    await message.reply('❌ Você precisa responder a uma mensagem OU escrever uma mensagem junto ao comando.\n\n💡 Exemplos:\n• !allg atenção pessoal\n• !allg (respondendo uma mensagem)');
-                    return;
+                    
+                    const chat2 = await message.getChat();
+                    const participants2 = chat2.participants;
+                    const mentions2 = participants2.map(p => p.id._serialized);
+                    
+                    // Verificar se tem mensagem personalizada (args após o comando)
+                    const mensagemPersonalizada = args.join(' ').trim();
+                    
+                    if (mensagemPersonalizada) {
+                        // Se tem mensagem personalizada, enviar ela marcando todos
+                        await client.sendMessage(groupId, mensagemPersonalizada, {
+                            mentions: mentions2
+                        });
+                        Logger.success(`Comando !allg executado - mensagem personalizada enviada para ${participants2.length} membros`);
+                    } else if (message.hasQuotedMsg) {
+                        // Se não tem mensagem personalizada mas tem mensagem citada, usar o método antigo
+                        const quotedMessage = await message.getQuotedMessage();
+                        
+                        if (quotedMessage.hasMedia) {
+                            // Mensagem com mídia
+                            const media = await quotedMessage.downloadMedia();
+                            const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
+                            
+                            await client.sendMessage(groupId, messageMedia, {
+                                caption: quotedMessage.body || '',
+                                mentions: mentions2
+                            });
+                        } else {
+                            // Mensagem de texto
+                            await client.sendMessage(groupId, quotedMessage.body, {
+                                mentions: mentions2
+                            });
+                        }
+                        Logger.success(`Comando !allg executado - mensagem repostada para ${participants2.length} membros`);
+                    } else {
+                        await message.reply('❌ Você precisa responder a uma mensagem OU escrever uma mensagem junto ao comando.\n\n💡 Exemplos:\n• !allg atenção pessoal\n• !allg (respondendo uma mensagem)');
+                        return;
+                    }
+                } catch (error) {
+                    Logger.error(`Erro no comando !allg: ${error.message}`);
+                    await message.reply('❌ Erro ao executar comando !allg. Verifique se sou administrador.');
                 }
                 break;
 
