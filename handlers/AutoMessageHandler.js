@@ -119,21 +119,37 @@ class AutoMessageHandler {
     }
 
     /**
-     * Converte o intervalo (ex: 5, 'minutes') para milissegundos.
+     * Converte o intervalo (ex: 5, 'minutes' ou 'm') para milissegundos.
      */
     static convertIntervalToMilliseconds(interval, unit) {
         const value = parseInt(interval, 10);
+        if (isNaN(value)) return 0; // Proteção extra
+
         switch (unit.toLowerCase()) {
+            case 'minuto':
             case 'minutos':
+            case 'minute':
             case 'minutes':
+            case 'm': // <-- Adicionamos a abreviação
                 return value * 60 * 1000;
+
+            case 'hora':
             case 'horas':
+            case 'hour':
             case 'hours':
+            case 'h': // <-- Adicionamos a abreviação
                 return value * 60 * 60 * 1000;
+
+            case 'dia':
             case 'dias':
+            case 'day':
             case 'days':
+            case 'd': // <-- Adicionamos a abreviação
                 return value * 24 * 60 * 60 * 1000;
+
             default:
+                // Se não reconhecer a unidade, loga um aviso
+                console.warn(`[AVISO] Unidade de tempo não reconhecida: "${unit}". Abortando agendamento.`);
                 return 0;
         }
     }
