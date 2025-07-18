@@ -21,11 +21,18 @@ class AutoMessageHandler {
         this.client = waClient;
         console.log('🔄 Iniciando serviço de mensagens automáticas...');
 
-        // A arrow function () => {} garante que o 'this' dentro da chamada
-        // se refere à nossa classe 'AutoMessageHandler'.
-        setInterval(() => this.fetchMessagesFromPanel(), 10 * 1000); // Busca a cada 10 segundos
+        // --- BINDING ---
+        // "Amarra" o 'this' da classe a cada função.
+        // Isso garante que, não importa como a função seja chamada,
+        // o 'this' sempre se referirá a 'AutoMessageHandler'.
+        this.fetchMessagesFromPanel = this.fetchMessagesFromPanel.bind(this);
+        this.syncMessages = this.syncMessages.bind(this);
+        this.scheduleMessage = this.scheduleMessage.bind(this);
+        this.sendMessage = this.sendMessage.bind(this);
+
+        // Agora que o 'this' está garantido, podemos chamar com segurança.
+        setInterval(this.fetchMessagesFromPanel, 10 * 1000); 
         
-        // A primeira chamada já estava correta, não precisa mudar.
         this.fetchMessagesFromPanel();
     }
 
