@@ -187,40 +187,24 @@ class AutoMessageHandler {
 
         try {
             if (messageData.full_media_url) {
-                // --- LÓGICA FINAL E ROBUSTA PARA MÍDIA ---
-                let tempFilePath = null; // Variável para guardar o caminho do arquivo
+                // --- LÓGICA FINAL COMBINADA ---
+                console.log(`[DEBUG] Baixando mídia com axios de: ${messageData.full_media_url}`);
+                    
+                // 1. Baixa a imagem como um buffer
+                const response = await axios.get(messageData.full_media_url, {
+                    responseType: 'arraybuffer'
+                });
+                const imageBuffer = Buffer.from(response.data, 'binary');
+                    
+                // 2. Pega o tipo de mídia (mimetype)
+                const mimetype = response.headers['content-type'];
 
-                try {
-                    console.log(`[DEBUG] Baixando mídia com axios de: ${messageData.full_media_url}`);
-                        
-                    // 1. Baixa a imagem como um buffer
-                    const response = await axios.get(messageData.full_media_url, {
-                        responseType: 'arraybuffer'
-                    });
-                        
-                    // 2. Define um caminho e nome para o arquivo temporário
-                    const tempDir = path.join(__dirname, '..', 'temp_media'); // Pasta na raiz do projeto
-                    await fs.mkdir(tempDir, { recursive: true }); // Cria a pasta se não existir
-                    const fileName = `media_${Date.now()}_${path.basename(messageData.full_media_url)}`;
-                    tempFilePath = path.join(tempDir, fileName);
-
-                    // 3. Salva o buffer no arquivo temporário
-                    await fs.writeFile(tempFilePath, response.data);
-                    console.log(`[DEBUG] Mídia salva temporariamente em: ${tempFilePath}`);
-
-                    // 4. Cria o MessageMedia a partir do ARQUIVO LOCAL
-                    const media = MessageMedia.fromFilePath(tempFilePath);
-                        
-                    // 5. Envia a mídia com a legenda
-                    await this.client.sendMessage(targetGroupId, media, { caption: messageData.content });
-
-                } finally {
-                    // 6. APAGA o arquivo temporário, mesmo se o envio falhar
-                    if (tempFilePath) {
-                        await fs.unlink(tempFilePath);
-                        console.log(`[DEBUG] Arquivo temporário removido: ${tempFilePath}`);
-                    }
-                }
+                // 3. Cria o MessageMedia a partir do BUFFER (não do arquivo)
+                // Esta é a forma mais fundamental de criar a mídia.
+                const media = new MessageMedia(mimetype, imageBuffer.toString('base64'), path.basename(messageData.full_media_url));
+                    
+                // 4. Envia a mídia com a legenda
+                await this.client.sendMessage(targetGroupId, media, { caption: messageData.content });
 
             } else {
                 // --- LÓGICA PARA TEXTO PURO (JÁ ESTÁ FUNCIONANDO) ---
@@ -231,7 +215,8 @@ class AutoMessageHandler {
             this.markAsSentInPanel(messageData.id);
 
         } catch (error) {
-            console.error(`❌ Falha ao enviar mensagem ID ${messageData.id}:`, error);
+            // Se houver um erro, agora ele deve ser capturado aqui.
+            console.error(`❌ Falha REAL ao enviar mensagem ID ${messageData.id}:`, error);
         }
     }
 
