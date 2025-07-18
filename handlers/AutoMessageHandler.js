@@ -32,10 +32,35 @@ class AutoMessageHandler {
         this.scheduleMessage = this.scheduleMessage.bind(this);
         this.sendMessage = this.sendMessage.bind(this);
 
+        // Lista os grupos disponíveis para debug
+        await this.listAvailableGroups();
+
         // Agora que o 'this' está garantido, podemos chamar com segurança.
         setInterval(this.fetchMessagesFromPanel, 10 * 1000); 
         
         this.fetchMessagesFromPanel();
+    }
+
+    /**
+     * Lista todos os grupos disponíveis para debug
+     */
+    static async listAvailableGroups() {
+        try {
+            console.log('📋 Listando grupos disponíveis...');
+            const chats = await this.client.getChats();
+            const groups = chats.filter(chat => chat.isGroup);
+            
+            console.log(`📊 Total de grupos encontrados: ${groups.length}`);
+            groups.forEach((group, index) => {
+                console.log(`${index + 1}. Nome: "${group.name}" | ID: ${group.id._serialized}`);
+            });
+            
+            if (groups.length === 0) {
+                console.log('⚠️  Nenhum grupo encontrado. Verifique se o WhatsApp está conectado e se há grupos disponíveis.');
+            }
+        } catch (error) {
+            console.error('❌ Erro ao listar grupos:', error.message);
+        }
     }
 
     /**
@@ -184,39 +209,79 @@ class AutoMessageHandler {
         const targetGroupId = '12036302965087023@g.us'; // SEU ID DE GRUPO
 
         console.log(`🚀 Enviando mensagem ID ${messageData.id} para ${targetGroupId}...`);
+        console.log(`[DEBUG] Conteúdo da mensagem: "${messageData.content}"`);
+        console.log(`[DEBUG] URL da mídia: ${messageData.full_media_url || 'Nenhuma'}`);
+
+        // Verificações de segurança
+        if (!this.client) {
+            console.error(`❌ ERRO CRÍTICO: Cliente WhatsApp não está inicializado!`);
+            return;
+        }
 
         try {
+            // Verifica se o cliente está conectado
+            const state = await this.client.getState();
+            console.log(`[DEBUG] Estado do cliente WhatsApp: ${state}`);
+            
+            if (state !== 'CONNECTED') {
+                console.error(`❌ ERRO: Cliente WhatsApp não está conectado. Estado atual: ${state}`);
+                return;
+            }
+
+            // Verifica se o grupo existe
+            try {
+                const chat = await this.client.getChatById(targetGroupId);
+                console.log(`[DEBUG] Grupo encontrado: ${chat.name || 'Nome não disponível'}`);
+            } catch (chatError) {
+                console.error(`❌ ERRO: Não foi possível encontrar o grupo ${targetGroupId}:`, chatError.message);
+                return;
+            }
+
+            let sentMessage = null;
+
             if (messageData.full_media_url) {
                 // --- LÓGICA FINAL COMBINADA ---
                 console.log(`[DEBUG] Baixando mídia com axios de: ${messageData.full_media_url}`);
                     
                 // 1. Baixa a imagem como um buffer
                 const response = await axios.get(messageData.full_media_url, {
-                    responseType: 'arraybuffer'
+                    responseType: 'arraybuffer',
+                    timeout: 30000 // 30 segundos timeout
                 });
+                console.log(`[DEBUG] Mídia baixada. Tamanho: ${response.data.byteLength} bytes`);
+                
                 const imageBuffer = Buffer.from(response.data, 'binary');
                     
                 // 2. Pega o tipo de mídia (mimetype)
                 const mimetype = response.headers['content-type'];
+                console.log(`[DEBUG] Mimetype detectado: ${mimetype}`);
 
                 // 3. Cria o MessageMedia a partir do BUFFER (não do arquivo)
-                // Esta é a forma mais fundamental de criar a mídia.
                 const media = new MessageMedia(mimetype, imageBuffer.toString('base64'), path.basename(messageData.full_media_url));
+                console.log(`[DEBUG] MessageMedia criado. Tamanho base64: ${media.data.length} caracteres`);
                     
                 // 4. Envia a mídia com a legenda
-                await this.client.sendMessage(targetGroupId, media, { caption: messageData.content });
+                sentMessage = await this.client.sendMessage(targetGroupId, media, { caption: messageData.content });
 
             } else {
-                // --- LÓGICA PARA TEXTO PURO (JÁ ESTÁ FUNCIONANDO) ---
-                await this.client.sendMessage(targetGroupId, messageData.content);
+                // --- LÓGICA PARA TEXTO PURO ---
+                sentMessage = await this.client.sendMessage(targetGroupId, messageData.content);
             }
-                
-            console.log(`✅ Mensagem ID ${messageData.id} enviada com sucesso.`);
+
+            console.log(`✅ Mensagem ID ${messageData.id} enviada com sucesso!`);
+            console.log(`[DEBUG] ID da mensagem enviada: ${sentMessage.id._serialized}`);
+            console.log(`[DEBUG] Timestamp do envio: ${sentMessage.timestamp}`);
+            
             this.markAsSentInPanel(messageData.id);
 
         } catch (error) {
-            // Se houver um erro, agora ele deve ser capturado aqui.
-            console.error(`❌ Falha REAL ao enviar mensagem ID ${messageData.id}:`, error);
+            console.error(`❌ FALHA REAL ao enviar mensagem ID ${messageData.id}:`);
+            console.error(`[DEBUG] Tipo do erro: ${error.constructor.name}`);
+            console.error(`[DEBUG] Mensagem do erro: ${error.message}`);
+            console.error(`[DEBUG] Stack trace:`, error.stack);
+            
+            // Não marca como enviado se houve erro
+            console.log(`[DEBUG] Mensagem ID ${messageData.id} NÃO foi marcada como enviada devido ao erro.`);
         }
     }
 
