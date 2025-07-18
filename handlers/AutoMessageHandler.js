@@ -1,7 +1,5 @@
 const axios = require('axios');
-const { MessageMedia } = require('whatsapp-web.js');
-const fs = require('fs').promises; // Usamos a versão com Promises
-const path = require('path');
+const Sender = require('../Sender');
 
 // Suas configurações devem vir de um arquivo central
 const config = {
@@ -13,14 +11,11 @@ const config = {
 
 class AutoMessageHandler {
     static activeMessages = new Map(); // Armazena as mensagens e seus timers
-    static client; // Referência ao cliente do WhatsApp
 
     /**
      * Inicia o serviço, buscando as mensagens e configurando os intervalos.
-     * @param {object} waClient - O cliente do whatsapp-web.js
      */
-    static async initialize(waClient) {
-        this.client = waClient;
+    static async initialize() {
         console.log('🔄 Iniciando serviço de mensagens automáticas...');
 
         // --- BINDING ---
@@ -32,36 +27,13 @@ class AutoMessageHandler {
         this.scheduleMessage = this.scheduleMessage.bind(this);
         this.sendMessage = this.sendMessage.bind(this);
 
-        // Lista os grupos disponíveis para debug
-        await this.listAvailableGroups();
-
         // Agora que o 'this' está garantido, podemos chamar com segurança.
         setInterval(this.fetchMessagesFromPanel, 10 * 1000); 
         
         this.fetchMessagesFromPanel();
     }
 
-    /**
-     * Lista todos os grupos disponíveis para debug
-     */
-    static async listAvailableGroups() {
-        try {
-            console.log('📋 Listando grupos disponíveis...');
-            const chats = await this.client.getChats();
-            const groups = chats.filter(chat => chat.isGroup);
-            
-            console.log(`📊 Total de grupos encontrados: ${groups.length}`);
-            groups.forEach((group, index) => {
-                console.log(`${index + 1}. Nome: "${group.name}" | ID: ${group.id._serialized}`);
-            });
-            
-            if (groups.length === 0) {
-                console.log('⚠️  Nenhum grupo encontrado. Verifique se o WhatsApp está conectado e se há grupos disponíveis.');
-            }
-        } catch (error) {
-            console.error('❌ Erro ao listar grupos:', error.message);
-        }
-    }
+
 
     /**
      * Busca as mensagens da API do Laravel.
@@ -202,86 +174,22 @@ class AutoMessageHandler {
     }
 
     /**
-     * Envia a mensagem para todos os grupos/contatos necessários.
+     * Envia a mensagem usando o módulo Sender centralizado.
      * @param {object} messageData - Os dados da mensagem.
      */
     static async sendMessage(messageData) {
         const targetGroupId = '12036302965087023@g.us'; // SEU ID DE GRUPO
 
-        console.log(`🚀 Enviando mensagem ID ${messageData.id} para ${targetGroupId}...`);
-        console.log(`[DEBUG] Conteúdo da mensagem: "${messageData.content}"`);
-        console.log(`[DEBUG] URL da mídia: ${messageData.full_media_url || 'Nenhuma'}`);
+        console.log(`🚀 Preparando para enviar mensagem ID ${messageData.id} via Sender...`);
 
-        // Verificações de segurança
-        if (!this.client) {
-            console.error(`❌ ERRO CRÍTICO: Cliente WhatsApp não está inicializado!`);
-            return;
-        }
+        const success = await Sender.sendMessage(
+            targetGroupId,
+            messageData.content,
+            messageData.full_media_url // Passa a URL da mídia, ou null se não houver
+        );
 
-        try {
-            // Verifica se o cliente está conectado
-            const state = await this.client.getState();
-            console.log(`[DEBUG] Estado do cliente WhatsApp: ${state}`);
-            
-            if (state !== 'CONNECTED') {
-                console.error(`❌ ERRO: Cliente WhatsApp não está conectado. Estado atual: ${state}`);
-                return;
-            }
-
-            // Verifica se o grupo existe
-            try {
-                const chat = await this.client.getChatById(targetGroupId);
-                console.log(`[DEBUG] Grupo encontrado: ${chat.name || 'Nome não disponível'}`);
-            } catch (chatError) {
-                console.error(`❌ ERRO: Não foi possível encontrar o grupo ${targetGroupId}:`, chatError.message);
-                return;
-            }
-
-            let sentMessage = null;
-
-            if (messageData.full_media_url) {
-                // --- LÓGICA FINAL COMBINADA ---
-                console.log(`[DEBUG] Baixando mídia com axios de: ${messageData.full_media_url}`);
-                    
-                // 1. Baixa a imagem como um buffer
-                const response = await axios.get(messageData.full_media_url, {
-                    responseType: 'arraybuffer',
-                    timeout: 30000 // 30 segundos timeout
-                });
-                console.log(`[DEBUG] Mídia baixada. Tamanho: ${response.data.byteLength} bytes`);
-                
-                const imageBuffer = Buffer.from(response.data, 'binary');
-                    
-                // 2. Pega o tipo de mídia (mimetype)
-                const mimetype = response.headers['content-type'];
-                console.log(`[DEBUG] Mimetype detectado: ${mimetype}`);
-
-                // 3. Cria o MessageMedia a partir do BUFFER (não do arquivo)
-                const media = new MessageMedia(mimetype, imageBuffer.toString('base64'), path.basename(messageData.full_media_url));
-                console.log(`[DEBUG] MessageMedia criado. Tamanho base64: ${media.data.length} caracteres`);
-                    
-                // 4. Envia a mídia com a legenda
-                sentMessage = await this.client.sendMessage(targetGroupId, media, { caption: messageData.content });
-
-            } else {
-                // --- LÓGICA PARA TEXTO PURO ---
-                sentMessage = await this.client.sendMessage(targetGroupId, messageData.content);
-            }
-
-            console.log(`✅ Mensagem ID ${messageData.id} enviada com sucesso!`);
-            console.log(`[DEBUG] ID da mensagem enviada: ${sentMessage.id._serialized}`);
-            console.log(`[DEBUG] Timestamp do envio: ${sentMessage.timestamp}`);
-            
+        if (success) {
             this.markAsSentInPanel(messageData.id);
-
-        } catch (error) {
-            console.error(`❌ FALHA REAL ao enviar mensagem ID ${messageData.id}:`);
-            console.error(`[DEBUG] Tipo do erro: ${error.constructor.name}`);
-            console.error(`[DEBUG] Mensagem do erro: ${error.message}`);
-            console.error(`[DEBUG] Stack trace:`, error.stack);
-            
-            // Não marca como enviado se houve erro
-            console.log(`[DEBUG] Mensagem ID ${messageData.id} NÃO foi marcada como enviada devido ao erro.`);
         }
     }
 

@@ -37,6 +37,9 @@ let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupCo
 // Importar handler de mensagens automáticas do Laravel
 const AutoMessageHandler = require('./handlers/AutoMessageHandler');
 
+// Importar módulo de envio centralizado
+const Sender = require('./Sender');
+
 // Configurar cliente WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth({
@@ -362,8 +365,12 @@ client.on('ready', async () => {
     // Notificar painel Laravel
     await notificarPainelLaravel();
     
+    // Inicializar módulo de envio centralizado
+    Sender.initialize(client);
+    Logger.success('Módulo de envio centralizado inicializado');
+    
     // Inicializar serviço de mensagens automáticas do Laravel
-    await AutoMessageHandler.initialize(client);
+    await AutoMessageHandler.initialize();
     Logger.success('Serviço de mensagens automáticas inicializado');
     
     // Enviar notificação para o dono
