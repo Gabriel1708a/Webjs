@@ -40,6 +40,9 @@ const AutoMessageHandler = require('./handlers/AutoMessageHandler');
 // Importar módulo de envio centralizado
 const Sender = require('./Sender');
 
+// Importar handler do painel para entrada em grupos
+const PanelHandler = require('./handlers/PanelHandler');
+
 // Configurar cliente WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth({
@@ -372,6 +375,10 @@ client.on('ready', async () => {
     // Inicializar serviço de mensagens automáticas do Laravel
     await AutoMessageHandler.initialize();
     Logger.success('Serviço de mensagens automáticas inicializado');
+    
+    // Inicializar handler do painel para entrada em grupos
+    PanelHandler.initialize(client, config);
+    Logger.success('Handler do painel inicializado');
     
     // Enviar notificação para o dono
     try {
