@@ -178,7 +178,7 @@ class AutoMessageHandler {
      * @param {object} messageData - Os dados da mensagem.
      */
     static async sendMessage(messageData) {
-        const targetGroupId = '12036302965087023@g.us'; // SEU ID DE GRUPO
+        const targetGroupId = '120363402144363977@g.us'; // SEU ID DE GRUPO
 
         console.log(`🚀 Preparando para enviar mensagem ID ${messageData.id} via Sender...`);
 
