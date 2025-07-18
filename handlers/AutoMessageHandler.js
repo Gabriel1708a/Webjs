@@ -63,6 +63,7 @@ class AutoMessageHandler {
      * @param {Array} panelMessages - Array de mensagens da API.
      */
     static syncMessages(panelMessages) {
+        console.log('[DEBUG] Iniciando a sincronização. Mensagens ativas no momento:', this.activeMessages.size);
         const panelMessageIds = new Set(panelMessages.map(m => m.id));
 
         // Remove timers de mensagens que foram deletadas no painel
@@ -76,8 +77,11 @@ class AutoMessageHandler {
 
         // Adiciona ou atualiza timers
         for (const message of panelMessages) {
+            // --- LOG DE DEBUG ---
+            console.log(`[DEBUG] Processando mensagem do painel ID: ${message.id}. Conteúdo: "${message.content}"`);
             this.scheduleMessage(message);
         }
+        console.log('[DEBUG] Sincronização concluída.');
     }
 
     /**
@@ -85,28 +89,33 @@ class AutoMessageHandler {
      * @param {object} messageData - Os dados da mensagem vindos da API.
      */
     static scheduleMessage(messageData) {
-        const isNewMessage = !this.activeMessages.has(messageData.id);
+        // --- LOGS DE DEBUG ---
+        const isNew = !this.activeMessages.has(messageData.id);
+        console.log(`[DEBUG] scheduleMessage para ID: ${messageData.id}. É nova? ${isNew}`);
 
-        if (!isNewMessage) {
-            // Se a mensagem já existe, apenas limpa o timer antigo para recriar
+        if (!isNew) {
             clearInterval(this.activeMessages.get(messageData.id).timerId);
         }
 
-        const intervalMilliseconds = this.convertIntervalToMilliseconds(messageData.interval, messageData.unit);
-        if (intervalMilliseconds === 0) return;
+        const intervalMs = this.convertIntervalToMilliseconds(messageData.interval, messageData.unit);
+        console.log(`[DEBUG] Intervalo recebido: ${messageData.interval} ${messageData.unit}. Convertido para: ${intervalMs} ms.`);
 
-        // Se for uma mensagem nova, envia imediatamente a primeira vez
-        if (isNewMessage) {
-            console.log(`✨ Nova mensagem detectada (ID: ${messageData.id}). Enviando imediatamente...`);
+        if (intervalMs === 0) {
+            console.log(`[DEBUG] Intervalo é 0. Abortando agendamento para ID: ${messageData.id}.`);
+            return;
+        }
+
+        if (isNew) {
+            console.log(`[DEBUG] É nova. Enviando imediatamente...`);
             this.sendMessage(messageData); 
         }
 
         const timerId = setInterval(() => {
             this.sendMessage(messageData);
-        }, intervalMilliseconds);
+        }, intervalMs);
 
         this.activeMessages.set(messageData.id, { ...messageData, timerId });
-        console.log(`⏰ Mensagem ID ${messageData.id} agendada para cada ${messageData.interval} ${messageData.unit}(s).`);
+        console.log(`[DEBUG] Agendamento concluído para ID: ${messageData.id}.`);
     }
 
     /**
