@@ -66,22 +66,27 @@ class AutoMessageHandler {
         console.log('[DEBUG] Iniciando a sincronização. Mensagens ativas no momento:', this.activeMessages.size);
         const panelMessageIds = new Set(panelMessages.map(m => m.id));
 
-        // Remove timers de mensagens que foram deletadas no painel
+        // Etapa 1: Remove timers de mensagens que foram deletadas no painel
         for (const localId of this.activeMessages.keys()) {
             if (!panelMessageIds.has(localId)) {
+                console.log(`[DEBUG] Mensagem ID ${localId} foi removida do painel. Parando timer.`);
                 clearInterval(this.activeMessages.get(localId).timerId);
                 this.activeMessages.delete(localId);
-                console.log(`🗑️ Timer removido para a mensagem ID: ${localId}`);
             }
         }
 
-        // Adiciona ou atualiza timers
+        // Etapa 2: Adiciona timers APENAS para mensagens novas
         for (const message of panelMessages) {
-            // --- LOG DE DEBUG ---
-            console.log(`[DEBUG] Processando mensagem do painel ID: ${message.id}. Conteúdo: "${message.content}"`);
+            // Se a mensagem JÁ TEM um timer ativo, PULA para a próxima.
+            if (this.activeMessages.has(message.id)) {
+                continue; 
+            }
+
+            // Se chegou aqui, é porque a mensagem é nova e não tem timer.
+            console.log(`[DEBUG] Nova mensagem do painel detectada ID: ${message.id}. Agendando...`);
             this.scheduleMessage(message);
         }
-        console.log('[DEBUG] Sincronização concluída.');
+        console.log('[DEBUG] Sincronização concluída. Total de timers ativos:', this.activeMessages.size);
     }
 
     /**
