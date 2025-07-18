@@ -8,6 +8,29 @@ const axios = require('axios');
 // Importar configurações
 const config = require('./config.json');
 
+// Função para notificar painel Laravel
+async function notificarPainelLaravel() {
+    if (!config.laravelApi?.enabled) return;
+
+    try {
+        await axios.post(`${config.laravelApi.baseUrl}/bots/registrar`, {
+            numero: config.numeroBot,
+            nome: config.botInfo.nome,
+            status: 'online'
+        }, {
+            headers: {
+                Authorization: `Bearer ${config.laravelApi.token}`
+            }
+        });
+
+        console.log('[BOT] Bot registrado com sucesso no painel Laravel!');
+        Logger.success('Bot registrado no painel Laravel');
+    } catch (error) {
+        console.error('[ERRO] Falha ao registrar bot no painel:', error.response?.data || error.message);
+        Logger.error(`Falha ao registrar bot no painel Laravel: ${error.message}`);
+    }
+}
+
 // Importar módulos de comandos (será feito após definir as classes)
 let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupControlHandler, horariosHandler, autoRespostaHandler;
 
@@ -332,6 +355,9 @@ client.on('ready', async () => {
     await loadNotifiedUsers(); // Carregar usuários já notificados
     
     Logger.success('Sistemas automáticos inicializados');
+    
+    // Notificar painel Laravel
+    await notificarPainelLaravel();
     
     // Enviar notificação para o dono
     try {
