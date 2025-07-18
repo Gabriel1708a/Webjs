@@ -21,8 +21,8 @@ class AutoMessageHandler {
         this.client = waClient;
         console.log('🔄 Iniciando serviço de mensagens automáticas...');
 
-        // Busca as mensagens do painel a cada 5 minutos para pegar novas e atualizadas
-        setInterval(this.fetchMessagesFromPanel, 5 * 60 * 1000);
+        // Busca as mensagens do painel a cada 10 segundos para testes (depois voltar para 5 min)
+        setInterval(this.fetchMessagesFromPanel, 10 * 1000); // Busca a cada 10 segundos
         
         // Executa a primeira busca imediatamente
         this.fetchMessagesFromPanel();
@@ -77,13 +77,21 @@ class AutoMessageHandler {
      * @param {object} messageData - Os dados da mensagem vindos da API.
      */
     static scheduleMessage(messageData) {
-        // Se já existe um timer para essa mensagem, limpa antes de criar um novo
-        if (this.activeMessages.has(messageData.id)) {
+        const isNewMessage = !this.activeMessages.has(messageData.id);
+
+        if (!isNewMessage) {
+            // Se a mensagem já existe, apenas limpa o timer antigo para recriar
             clearInterval(this.activeMessages.get(messageData.id).timerId);
         }
 
         const intervalMilliseconds = this.convertIntervalToMilliseconds(messageData.interval, messageData.unit);
         if (intervalMilliseconds === 0) return;
+
+        // Se for uma mensagem nova, envia imediatamente a primeira vez
+        if (isNewMessage) {
+            console.log(`✨ Nova mensagem detectada (ID: ${messageData.id}). Enviando imediatamente...`);
+            this.sendMessage(messageData); 
+        }
 
         const timerId = setInterval(() => {
             this.sendMessage(messageData);
