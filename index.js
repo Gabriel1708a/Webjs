@@ -34,6 +34,9 @@ async function notificarPainelLaravel() {
 // Importar módulos de comandos (será feito após definir as classes)
 let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupControlHandler, horariosHandler, autoRespostaHandler;
 
+// Importar handler de mensagens automáticas do Laravel
+const AutoMessageHandler = require('./handlers/AutoMessageHandler');
+
 // Configurar cliente WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth({
@@ -358,6 +361,10 @@ client.on('ready', async () => {
     
     // Notificar painel Laravel
     await notificarPainelLaravel();
+    
+    // Inicializar serviço de mensagens automáticas do Laravel
+    await AutoMessageHandler.initialize(client);
+    Logger.success('Serviço de mensagens automáticas inicializado');
     
     // Enviar notificação para o dono
     try {
