@@ -17,14 +17,17 @@ class PanelHandler {
         const app = express();
         app.use(express.json()); // Habilita o parsing de JSON no corpo das requisições
 
-        const PORT = 3000; // Porta que o bot vai escutar
+        // Configurações do servidor (pode ser alterado no config.json)
+        const PORT = config.panelHandler?.port || 3000;
+        const HOST = config.panelHandler?.host || '0.0.0.0';
 
         // Rota para receber a solicitação de entrar em um grupo
         app.post('/join-group', this.handleJoinGroupRequest.bind(this));
 
-        app.listen(PORT, () => {
+        app.listen(PORT, HOST, () => {
             console.log(`🤖 Servidor do Bot escutando na porta ${PORT}`);
-            console.log(`   - Endpoint para entrar em grupos: http://localhost:${PORT}/join-group`);
+            console.log(`   - Host: ${HOST}`);
+            console.log(`   - Endpoint para entrar em grupos: http://${HOST}:${PORT}/join-group`);
         });
     }
 
