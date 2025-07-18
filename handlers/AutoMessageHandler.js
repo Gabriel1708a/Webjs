@@ -59,7 +59,7 @@ class AutoMessageHandler {
     }
 
     /**
-     * Sincroniza as mensagens locais com as recebidas do painel.
+     * Sincroniza as mensagens locais com as recebidas do painel, lidando com edições.
      * @param {Array} panelMessages - Array de mensagens da API.
      */
     static syncMessages(panelMessages) {
@@ -75,16 +75,31 @@ class AutoMessageHandler {
             }
         }
 
-        // Etapa 2: Adiciona timers APENAS para mensagens novas
-        for (const message of panelMessages) {
-            // Se a mensagem JÁ TEM um timer ativo, PULA para a próxima.
-            if (this.activeMessages.has(message.id)) {
-                continue; 
+        // Etapa 2: Adiciona ou ATUALIZA timers
+        for (const panelMessage of panelMessages) {
+            const existingMessage = this.activeMessages.get(panelMessage.id);
+
+            // CASO 1: A mensagem é completamente nova.
+            if (!existingMessage) {
+                console.log(`[DEBUG] Nova mensagem do painel detectada ID: ${panelMessage.id}. Agendando...`);
+                this.scheduleMessage(panelMessage);
+                continue; // Pula para a próxima
             }
 
-            // Se chegou aqui, é porque a mensagem é nova e não tem timer.
-            console.log(`[DEBUG] Nova mensagem do painel detectada ID: ${message.id}. Agendando...`);
-            this.scheduleMessage(message);
+            // CASO 2: A mensagem já existe. Vamos verificar se mudou.
+            const hasChanged =
+                existingMessage.content !== panelMessage.content ||
+                existingMessage.interval !== panelMessage.interval ||
+                existingMessage.unit !== panelMessage.unit ||
+                existingMessage.media_url !== panelMessage.media_url;
+
+            if (hasChanged) {
+                console.log(`[DEBUG] Mensagem ID ${panelMessage.id} foi atualizada no painel. Reagendando...`);
+                // Para reagendar, simplesmente chamamos scheduleMessage de novo.
+                // A função já lida com limpar o timer antigo.
+                this.scheduleMessage(panelMessage);
+            }
+            // Se não mudou, não fazemos nada e deixamos o timer antigo correr.
         }
         console.log('[DEBUG] Sincronização concluída. Total de timers ativos:', this.activeMessages.size);
     }
@@ -164,24 +179,25 @@ class AutoMessageHandler {
      * @param {object} messageData - Os dados da mensagem.
      */
     static async sendMessage(messageData) {
-        // IMPORTANTE: Você precisa definir para onde a mensagem será enviada.
-        // Vou usar um exemplo de ID de grupo fixo. Você precisa adaptar essa lógica.
-        const targetGroupId = '120363402144363977@g.us'; // SUBSTITUA PELO ID DO GRUPO CORRETO
+        const targetGroupId = '12036302965087023@g.us'; // SUBSTITUA PELO ID DO GRUPO CORRETO
 
         console.log(`🚀 Enviando mensagem ID ${messageData.id} para ${targetGroupId}...`);
 
         try {
-            let media = null;
             if (messageData.full_media_url) {
-                // Baixa a mídia da URL pública do Laravel
-                media = await MessageMedia.fromUrl(messageData.full_media_url, { unsafeMime: true });
-            }
+                // --- LÓGICA PARA MÍDIA ---
+                console.log(`[DEBUG] Baixando mídia de: ${messageData.full_media_url}`);
+                const media = await MessageMedia.fromUrl(messageData.full_media_url, { unsafeMime: true });
+                    
+                // Envia a mídia com o conteúdo como legenda (caption)
+                await this.client.sendMessage(targetGroupId, media, { caption: messageData.content });
 
-            await this.client.sendMessage(targetGroupId, messageData.content, { media });
-            
+            } else {
+                // --- LÓGICA PARA TEXTO PURO ---
+                await this.client.sendMessage(targetGroupId, messageData.content);
+            }
+                
             console.log(`✅ Mensagem ID ${messageData.id} enviada com sucesso.`);
-            
-            // Informa ao painel que a mensagem foi enviada (Etapa 3)
             this.markAsSentInPanel(messageData.id);
 
         } catch (error) {
