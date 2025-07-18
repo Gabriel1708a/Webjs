@@ -21,10 +21,11 @@ class AutoMessageHandler {
         this.client = waClient;
         console.log('🔄 Iniciando serviço de mensagens automáticas...');
 
-        // Busca as mensagens do painel a cada 10 segundos para testes (depois voltar para 5 min)
-        setInterval(this.fetchMessagesFromPanel, 10 * 1000); // Busca a cada 10 segundos
+        // A arrow function () => {} garante que o 'this' dentro da chamada
+        // se refere à nossa classe 'AutoMessageHandler'.
+        setInterval(() => this.fetchMessagesFromPanel(), 10 * 1000); // Busca a cada 10 segundos
         
-        // Executa a primeira busca imediatamente
+        // A primeira chamada já estava correta, não precisa mudar.
         this.fetchMessagesFromPanel();
     }
 
