@@ -1,5 +1,7 @@
 const axios = require('axios');
 const { MessageMedia } = require('whatsapp-web.js');
+const fs = require('fs').promises; // Usamos a versão com Promises
+const path = require('path');
 
 // Suas configurações devem vir de um arquivo central
 const config = {
@@ -179,21 +181,49 @@ class AutoMessageHandler {
      * @param {object} messageData - Os dados da mensagem.
      */
     static async sendMessage(messageData) {
-        const targetGroupId = '12036302965087023@g.us'; // SUBSTITUA PELO ID DO GRUPO CORRETO
+        const targetGroupId = '12036302965087023@g.us'; // SEU ID DE GRUPO
 
         console.log(`🚀 Enviando mensagem ID ${messageData.id} para ${targetGroupId}...`);
 
         try {
             if (messageData.full_media_url) {
-                // --- LÓGICA PARA MÍDIA ---
-                console.log(`[DEBUG] Baixando mídia de: ${messageData.full_media_url}`);
-                const media = await MessageMedia.fromUrl(messageData.full_media_url, { unsafeMime: true });
-                    
-                // Envia a mídia com o conteúdo como legenda (caption)
-                await this.client.sendMessage(targetGroupId, media, { caption: messageData.content });
+                // --- LÓGICA FINAL E ROBUSTA PARA MÍDIA ---
+                let tempFilePath = null; // Variável para guardar o caminho do arquivo
+
+                try {
+                    console.log(`[DEBUG] Baixando mídia com axios de: ${messageData.full_media_url}`);
+                        
+                    // 1. Baixa a imagem como um buffer
+                    const response = await axios.get(messageData.full_media_url, {
+                        responseType: 'arraybuffer'
+                    });
+                        
+                    // 2. Define um caminho e nome para o arquivo temporário
+                    const tempDir = path.join(__dirname, '..', 'temp_media'); // Pasta na raiz do projeto
+                    await fs.mkdir(tempDir, { recursive: true }); // Cria a pasta se não existir
+                    const fileName = `media_${Date.now()}_${path.basename(messageData.full_media_url)}`;
+                    tempFilePath = path.join(tempDir, fileName);
+
+                    // 3. Salva o buffer no arquivo temporário
+                    await fs.writeFile(tempFilePath, response.data);
+                    console.log(`[DEBUG] Mídia salva temporariamente em: ${tempFilePath}`);
+
+                    // 4. Cria o MessageMedia a partir do ARQUIVO LOCAL
+                    const media = MessageMedia.fromFilePath(tempFilePath);
+                        
+                    // 5. Envia a mídia com a legenda
+                    await this.client.sendMessage(targetGroupId, media, { caption: messageData.content });
+
+                } finally {
+                    // 6. APAGA o arquivo temporário, mesmo se o envio falhar
+                    if (tempFilePath) {
+                        await fs.unlink(tempFilePath);
+                        console.log(`[DEBUG] Arquivo temporário removido: ${tempFilePath}`);
+                    }
+                }
 
             } else {
-                // --- LÓGICA PARA TEXTO PURO ---
+                // --- LÓGICA PARA TEXTO PURO (JÁ ESTÁ FUNCIONANDO) ---
                 await this.client.sendMessage(targetGroupId, messageData.content);
             }
                 
