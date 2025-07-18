@@ -37,6 +37,9 @@ let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupCo
 // Importar handler de mensagens automáticas do Laravel
 const AutoMessageHandler = require('./handlers/AutoMessageHandler');
 
+// Importar handler do painel para entrar em grupos
+const PanelHandler = require('./handlers/PanelHandler');
+
 // Importar módulo de envio centralizado
 const Sender = require('./Sender');
 
@@ -372,6 +375,10 @@ client.on('ready', async () => {
     // Inicializar serviço de mensagens automáticas do Laravel
     await AutoMessageHandler.initialize();
     Logger.success('Serviço de mensagens automáticas inicializado');
+    
+    // Inicializar handler do painel para entrar em grupos
+    PanelHandler.initialize(client, config);
+    Logger.success('Servidor do painel inicializado');
     
     // Enviar notificação para o dono
     try {
