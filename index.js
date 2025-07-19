@@ -377,7 +377,7 @@ client.on('ready', async () => {
     Logger.success('Serviço de mensagens automáticas inicializado');
     
     // Inicializar handler do painel para entrada em grupos
-    PanelHandler.initialize(client, config);
+    PanelHandler.initialize();
     Logger.success('Handler do painel inicializado');
     
     // Enviar notificação para o dono

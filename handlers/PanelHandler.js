@@ -2,102 +2,79 @@
 
 const express = require('express');
 const axios = require('axios');
+const Sender = require('../Sender'); // Usaremos o Sender para pegar o cliente
 
 class PanelHandler {
-    static client; // Referência ao cliente do WhatsApp
-    static laravelApiConfig; // Configurações da API do Laravel
+    static client;
+    static app;
 
-    /**
-     * Inicializa o handler com o cliente e as configurações.
-     * @param {object} waClient - O cliente do whatsapp-web.js.
-     * @param {object} config - O objeto de configuração com os dados da API Laravel.
-     */
-    static initialize(waClient, config) {
-        this.client = waClient;
-        this.laravelApiConfig = config.laravelApi;
+    static initialize() {
+        this.client = Sender.client; // Pega a referência do cliente do Sender
+        if (!this.client) {
+            console.error('[PanelHandler] Erro Crítico: Cliente do WhatsApp não está disponível via Sender.');
+            return;
+        }
 
-        const app = express();
-        app.use(express.json()); // Habilita o parsing de JSON no corpo das requisições
+        this.app = express();
+        this.app.use(express.json());
 
-        const PORT = 3000; // Porta que o bot vai escutar
+        const port = 3000;
 
-        // Rota para receber a solicitação de entrar em um grupo
-        app.post('/join-group', this.handleJoinGroupRequest.bind(this));
+        this.app.post('/join-group', this.handleJoinGroupRequest.bind(this));
 
-        app.listen(PORT, () => {
-            console.log(`🤖 Servidor do Bot escutando na porta ${PORT}`);
-            console.log(`   - Endpoint para entrar em grupos: http://localhost:${PORT}/join-group`);
+        this.app.listen(port, '0.0.0.0', () => {
+            console.log(`✅ Servidor do painel inicializado. Escutando na porta ${port}.`);
         });
     }
 
-    /**
-     * Lida com a requisição vinda do painel Laravel.
-     */
     static async handleJoinGroupRequest(req, res) {
         const { group_link, user_id } = req.body;
+
+        console.log(`[PanelHandler] Recebida solicitação para grupo: ${group_link} | Usuário ID: ${user_id}`);
 
         if (!group_link || !user_id) {
             return res.status(400).json({ success: false, message: 'group_link e user_id são obrigatórios.' });
         }
 
-        console.log(`[PanelHandler] Recebida solicitação para entrar no grupo: ${group_link} para o usuário ID: ${user_id}`);
-
         try {
-            // Extrai o código do convite do link
-            const inviteCode = group_link.split('https://chat.whatsapp.com/')[1];
-            if (!inviteCode) {
-                throw new Error('Link de convite inválido.');
+            let groupChat;
+            let inviteCode = group_link;
+
+            // 1. Extrai o código do convite da URL, se for uma URL
+            if (group_link.includes('chat.whatsapp.com/')) {
+                inviteCode = group_link.split('chat.whatsapp.com/')[1];
             }
 
-            // Entra no grupo usando o código
+            // 2. Tenta entrar no grupo usando o código
+            console.log(`[PanelHandler] Tentando entrar no grupo com o código: ${inviteCode}`);
             const groupId = await this.client.acceptInvite(inviteCode);
-            console.log(`[PanelHandler] Bot entrou no grupo com sucesso! ID: ${groupId}`);
+            console.log(`[PanelHandler] Bot entrou no grupo com sucesso. ID do Grupo: ${groupId}`);
+            
+            // 3. Pega os detalhes do grupo
+            groupChat = await this.client.getChatById(groupId);
+            
+            const groupData = {
+                user_id: user_id,
+                group_id: groupChat.id._serialized,
+                name: groupChat.name,
+                is_active: true,
+                // Adicione a data de expiração se necessário, ex:
+                // expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 dias a partir de agora
+            };
 
-            // Aguarda um pouco para o chat ser totalmente carregado
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // 4. Envia os dados do grupo de volta para o Laravel
+            console.log('[PanelHandler] Enviando confirmação para o painel Laravel...');
+            await axios.post('http://SEU_DOMINIO_LARAVEL/api/groups/confirm', groupData); // <-- ATUALIZE SUA URL AQUI
 
-            // Pega os detalhes do grupo
-            const chat = await this.client.getChatById(groupId);
-            const groupName = chat.name;
-            const groupIconUrl = await chat.getProfilePicUrl() || null;
-
-            // Envia a confirmação para a API do Laravel
-            await this.confirmGroupInPanel(user_id, groupId, groupName, groupIconUrl);
-
-            // Responde ao painel Laravel que a operação foi um sucesso
-            res.status(200).json({ success: true, message: 'Bot entrou no grupo e confirmou no painel.', groupId: groupId });
+            return res.status(200).json({ success: true, message: 'Bot entrou no grupo e dados foram confirmados.' });
 
         } catch (error) {
-            console.error('[PanelHandler] Erro ao tentar entrar no grupo:', error);
-            res.status(500).json({ success: false, message: error.message });
-        }
-    }
-
-    /**
-     * Envia os dados do grupo para a API do Laravel para confirmar o cadastro.
-     */
-    static async confirmGroupInPanel(userId, groupId, groupName, groupIconUrl) {
-        const url = `${this.laravelApiConfig.baseUrl}/groups/confirm`;
-        const token = this.laravelApiConfig.token;
-
-        const payload = {
-            user_id: userId,
-            group_id: groupId,
-            name: groupName,
-            icon_url: groupIconUrl,
-        };
-
-        try {
-            console.log(`[PanelHandler] Enviando confirmação para o painel Laravel:`, payload);
-            await axios.post(url, payload, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json'
-                }
-            });
-            console.log(`[PanelHandler] Confirmação enviada com sucesso para o painel.`);
-        } catch (error) {
-            console.error('[PanelHandler] Erro ao enviar confirmação para o painel:', error.response?.data || error.message);
+            console.error('[PanelHandler] Erro ao tentar entrar no grupo:', error.message);
+            // Verifica se o erro é porque o bot já está no grupo
+            if (error.message.includes('already in group')) {
+                 return res.status(400).json({ success: false, message: 'O bot já está neste grupo.' });
+            }
+            return res.status(500).json({ success: false, message: 'Ocorreu um erro no bot ao tentar entrar no grupo.' });
         }
     }
 }
