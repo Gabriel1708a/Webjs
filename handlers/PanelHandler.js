@@ -64,7 +64,7 @@ class PanelHandler {
 
             // 4. Envia os dados do grupo de volta para o Laravel
             console.log('[PanelHandler] Enviando confirmação para o painel Laravel...');
-            await axios.post('http://SEU_DOMINIO_LARAVEL/api/groups/confirm', groupData); // <-- ATUALIZE SUA URL AQUI
+            await axios.post('http://painel.botwpp.tech/api/groups/confirm', groupData); // <-- ATUALIZE SUA URL AQUI
 
             return res.status(200).json({ success: true, message: 'Bot entrou no grupo e dados foram confirmados.' });
 
