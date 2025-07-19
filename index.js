@@ -263,8 +263,8 @@ class RentalSystem {
 class Utils {
     static async isAdmin(message) {
         try {
-            if (!message.author) {
-                Logger.warning('isAdmin: message.author não encontrado');
+            if (!message.from) {
+                Logger.warning('isAdmin: message.from não encontrado');
                 return false;
             }
 
@@ -276,18 +276,18 @@ class Utils {
 
             // Buscar participante específico
             const participant = chat.participants.find(p => 
-                p.id._serialized === message.author
+                p.id._serialized === message.from
             );
 
             if (!participant) {
-                Logger.warning(`isAdmin: Participante não encontrado - ${message.author}`);
+                Logger.warning(`isAdmin: Participante não encontrado - ${message.from}`);
                 return false;
             }
 
             const isAdmin = participant.isAdmin || participant.isSuperAdmin;
             
             if (isAdmin) {
-                Logger.admin(`Admin detectado: ${message.author.replace('@c.us', '')}`);
+                Logger.admin(`Admin detectado: ${message.from.replace('@c.us', '')}`);
             }
 
             return isAdmin;
@@ -299,8 +299,8 @@ class Utils {
     }
 
     static isOwner(message) {
-        if (!message.author) return false;
-        const authorNumber = message.author.replace('@c.us', '');
+        if (!message.from) return false;
+        const authorNumber = message.from.replace('@c.us', '');
         const isOwner = authorNumber === config.numeroDono;
         
         if (isOwner) {
@@ -323,8 +323,8 @@ class Utils {
     }
 
     static getUsername(message) {
-        if (!message.author) return 'Desconhecido';
-        return message.author.replace('@c.us', '');
+        if (!message.from) return 'Desconhecido';
+        return message.from.replace('@c.us', '');
     }
 
     static getGroupName(groupId) {
@@ -903,7 +903,7 @@ client.on('message_create', async (message) => {
                 const debugChat = await message.getChat();
                 
                 const debugInfo = `🔍 *DEBUG COMPLETO DO BOT*\n\n` +
-                    `👤 *Seu número:* ${message.author ? message.author.replace('@c.us', '') : 'Não detectado'}\n` +
+                    `👤 *Seu número:* ${message.from ? message.from.replace('@c.us', '') : 'Não detectado'}\n` +
                     `👑 *Dono configurado:* ${config.numeroDono}\n` +
                     `✅ *É o dono?* ${isOwner ? '✅ SIM' : '❌ NÃO'}\n` +
                     `🛡️ *É admin?* ${isAdmin ? '✅ SIM' : '❌ NÃO'}\n` +

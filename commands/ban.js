@@ -177,8 +177,8 @@ class BanHandler {
         }
 
         // Verificar ban gringo (números não brasileiros)
-        if (config.banGringo && message.author) {
-            const userNumber = message.author.replace('@c.us', '');
+        if (config.banGringo && message.from) {
+            const userNumber = message.from.replace('@c.us', '');
             if (!userNumber.startsWith('55')) {
                 shouldDelete = true;
                 shouldBan = true;
@@ -193,7 +193,7 @@ class BanHandler {
                 
                 if (shouldBan) {
                     const chat = await message.getChat();
-                    await chat.removeParticipants([message.author]);
+                    await chat.removeParticipants([message.from]);
                     await client.sendMessage(groupId, `🔨 *Usuário banido por ${reason}!*`);
                 } else {
                     await client.sendMessage(groupId, `🗑️ *Mensagem removida: ${reason}*`);
