@@ -43,6 +43,9 @@ const Sender = require('./Sender');
 // Importar handler do painel para entrada em grupos
 const PanelHandler = require('./handlers/PanelHandler');
 
+// Importar o sistema unificado de anúncios
+const AdManager = require('./commands/AdManager');
+
 // Configurar cliente WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth({
@@ -379,6 +382,10 @@ client.on('ready', async () => {
     // Inicializar handler do painel para entrada em grupos
     PanelHandler.initialize();
     Logger.success('Handler do painel inicializado');
+    
+    // Inicializar sistema unificado de anúncios
+    await AdManager.initialize(client);
+    Logger.success('Sistema unificado de anúncios inicializado');
     
     // Enviar notificação para o dono
     try {
@@ -822,7 +829,7 @@ client.on('message_create', async (message) => {
             case 'addads':
             case 'listads':
             case 'rmads':
-                await adsHandler.handle(client, message, command, args);
+                await AdManager.handleCommand(message, command, args);
                 break;
 
             case 'bv':

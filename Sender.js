@@ -16,36 +16,68 @@ class Sender {
     }
 
     /**
-     * A única função que envia mensagens para o WhatsApp.
-     * @param {string} targetId - O ID do grupo ou usuário.
-     * @param {string} content - O texto da mensagem.
-     * @param {string|null} mediaUrl - A URL da mídia (opcional).
+     * Envia uma mensagem para um grupo, com suporte opcional para mídia via URL.
+     * @param {object|string} clientOrTargetId - A instância do cliente do whatsapp-web.js OU o ID do grupo (compatibilidade).
+     * @param {string} groupIdOrContent - O ID do grupo OU o texto da mensagem (compatibilidade).
+     * @param {string} contentOrMediaUrl - O texto da mensagem OU a URL da mídia (compatibilidade).
+     * @param {string|null} mediaUrl - A URL completa da mídia a ser enviada (opcional).
+     * @returns {boolean} - Retorna true se o envio foi bem-sucedido, false caso contrário.
      */
-    static async sendMessage(targetId, content, mediaUrl = null) {
-        if (!this.client) {
+    static async sendMessage(clientOrTargetId, groupIdOrContent, contentOrMediaUrl = null, mediaUrl = null) {
+        let client, targetId, content, finalMediaUrl;
+
+        // Detecta se está sendo chamado com cliente como primeiro parâmetro (AdManager) ou sem cliente (AutoMessageHandler)
+        if (typeof clientOrTargetId === 'object' && clientOrTargetId.sendMessage) {
+            // Nova assinatura: sendMessage(client, groupId, content, mediaUrl)
+            client = clientOrTargetId;
+            targetId = groupIdOrContent;
+            content = contentOrMediaUrl;
+            finalMediaUrl = mediaUrl;
+        } else {
+            // Assinatura antiga: sendMessage(targetId, content, mediaUrl)
+            client = this.client;
+            targetId = clientOrTargetId;
+            content = groupIdOrContent;
+            finalMediaUrl = contentOrMediaUrl;
+        }
+
+        if (!client) {
             console.error('❌ ERRO GRAVE: O Sender não foi inicializado com um cliente.');
             return false;
         }
 
         try {
-            if (mediaUrl) {
-                // Lógica robusta de envio de mídia
-                const response = await axios.get(mediaUrl, { responseType: 'arraybuffer' });
-                const mediaBuffer = Buffer.from(response.data, 'binary');
-                const mimetype = response.headers['content-type'];
-                const media = new MessageMedia(mimetype, mediaBuffer.toString('base64'), path.basename(mediaUrl));
-                    
-                await this.client.sendMessage(targetId, media, { caption: content });
-            } else {
-                // Lógica de texto puro
-                await this.client.sendMessage(targetId, content);
+            let media = null;
+            // Se uma URL de mídia foi fornecida, baixe-a
+            if (finalMediaUrl) {
+                console.log(`[Sender] Baixando mídia de: ${finalMediaUrl}`);
+                try {
+                    const response = await axios.get(finalMediaUrl, { responseType: 'arraybuffer' });
+                    const mediaBuffer = Buffer.from(response.data, 'binary');
+                    const mimetype = response.headers['content-type'];
+                    media = new MessageMedia(mimetype, mediaBuffer.toString('base64'), path.basename(finalMediaUrl));
+                } catch (urlError) {
+                    console.error(`[Sender] Falha ao baixar mídia da URL: ${finalMediaUrl}. Enviando apenas texto.`, urlError);
+                    media = null; // Garante que a mídia é nula se o download falhar
+                }
             }
-            console.log(`✅ Mensagem enviada com sucesso para ${targetId}.`);
-            return true; // Retorna sucesso
+
+            // Define as opções de envio
+            const options = {};
+            if (media) {
+                // Se a mídia existe, o 'content' vira a legenda (caption)
+                options.caption = content;
+            }
+
+            // Envia a mensagem: envia a mídia com legenda, ou apenas o texto
+            await client.sendMessage(targetId, media || content, options);
+            
+            console.log(`[Sender] Mensagem enviada com sucesso para ${targetId}.`);
+            return true;
 
         } catch (error) {
-            console.error(`❌ Falha ao enviar mensagem para ${targetId}:`, error);
-            return false; // Retorna falha
+            console.error(`[Sender] Falha catastrófica ao enviar mensagem para ${targetId}:`, error);
+            return false;
         }
     }
 }
