@@ -42,34 +42,31 @@ class PanelHandler {
 
             let groupChat = await this.processGroupJoin(inviteCode);
             
-            // --- LÓGICA NOVA E ROBUSTA PARA OBTER O NOME ---
+            // --- LÓGICA PARA OBTER NOME E FOTO ---
             let groupName = groupChat.name;
+            let groupIconUrl = null; // Inicia como nulo
 
-            // Se o nome não veio na primeira tentativa, vamos forçar um "reload" dos dados.
+            // Fallback para o nome, caso ainda falhe
             if (!groupName) {
-                console.warn('[PanelHandler] Nome do grupo veio como undefined. Tentando recarregar os dados do chat...');
-                try {
-                    // O método .reload() foi feito para isso, mas pode não ser 100% confiável.
-                    await groupChat.reload(); 
-                    groupName = groupChat.name; // Tenta pegar o nome de novo
-                    console.log(`[PanelHandler] DEBUG: Nome após reload: ${groupName}`);
-                } catch (reloadError) {
-                    console.error('[PanelHandler] Erro ao tentar recarregar o chat:', reloadError.message);
-                }
+                console.warn(`[PanelHandler] ⚠️ Nome não disponível, usando fallback. ID: ${groupChat.id._serialized}`);
+                groupName = `Grupo ${groupChat.id.user}`;
             }
 
-            // --- PLANO B (FALLBACK) ---
-            // Se, mesmo depois de tudo, o nome ainda não existir, usamos um nome padrão.
-            if (!groupName) {
-                console.warn(`[PanelHandler] ⚠️ Nome ainda não disponível, usando fallback. ID do Grupo: ${groupChat.id._serialized}`);
-                groupName = `Grupo ${groupChat.id.user}`; // Ex: "Grupo 12036329..."
+            // Tenta obter a URL da foto do perfil do grupo
+            try {
+                groupIconUrl = await groupChat.getProfilePicUrl();
+                console.log(`[PanelHandler] ✅ URL do ícone do grupo obtida: ${groupIconUrl}`);
+            } catch (picError) {
+                console.warn(`[PanelHandler] ⚠️ Não foi possível obter a foto do grupo. Pode não ter uma ou ser privada.`);
+                // Deixa groupIconUrl como null
             }
-            // --- FIM DA NOVA LÓGICA ---
+            // --- FIM DA LÓGICA ---
 
             const groupData = {
                 user_id: user_id,
                 group_id: groupChat.id._serialized,
-                name: groupName, // Usamos a variável segura que SEMPRE terá um valor
+                name: groupName,
+                icon_url: groupIconUrl, // <-- CAMPO NOVO ADICIONADO
                 is_active: true,
                 expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
             };
