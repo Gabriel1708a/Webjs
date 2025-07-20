@@ -152,7 +152,8 @@ class AdManager {
                     const ad = adsData.anuncios[groupId][adId];
                     
                     // Verificar se está ativo (compatibilidade com ambos formatos)
-                    const isActive = ad.active || ad.ativo;
+                    // Se não tem propriedade de ativo, considera ativo por padrão (compatibilidade)
+                    const isActive = ad.active !== false && ad.ativo !== false;
                     
                     if (isActive) {
                         foundAds = true;
@@ -201,40 +202,49 @@ class AdManager {
         }
 
         try {
+            console.log(`[AdManager] Iniciando remoção do anúncio ID ${adIdToRemove}...`);
+            
             // Carregar anúncios existentes
             const adsData = await this.loadAdsFromFile();
             const groupId = message.from;
 
+            console.log(`[AdManager] Grupo: ${groupId}`);
+            console.log(`[AdManager] Anúncios no grupo:`, Object.keys(adsData.anuncios[groupId] || {}));
+
             // Verificar se o anúncio existe neste grupo
             if (!adsData.anuncios[groupId] || !adsData.anuncios[groupId][adIdToRemove]) {
+                console.log(`[AdManager] Anúncio ID ${adIdToRemove} NÃO encontrado no grupo ${groupId}`);
                 return message.reply(`❌ *Anúncio ID ${adIdToRemove} não encontrado neste grupo!*\n\n💡 Use \`!listads\` para ver os anúncios disponíveis.`);
             }
 
-            // Marcar como inativo ao invés de deletar (compatibilidade)
-            const ad = adsData.anuncios[groupId][adIdToRemove];
-            ad.ativo = false;
-            ad.active = false;
+            console.log(`[AdManager] Anúncio encontrado:`, adsData.anuncios[groupId][adIdToRemove]);
 
-            // Verificar se há anúncios ativos restantes no grupo
-            const activeAdsInGroup = Object.keys(adsData.anuncios[groupId]).filter(id => {
-                const adData = adsData.anuncios[groupId][id];
-                return adData.ativo || adData.active;
-            });
+            // DELETAR PERMANENTEMENTE o anúncio do arquivo
+            delete adsData.anuncios[groupId][adIdToRemove];
+            console.log(`[AdManager] ✅ Anúncio ID ${adIdToRemove} deletado permanentemente do arquivo.`);
 
-            // Se não há anúncios ativos, não remover o grupo (manter histórico)
+            // Se não há mais anúncios no grupo, remover o grupo também
+            if (Object.keys(adsData.anuncios[groupId]).length === 0) {
+                delete adsData.anuncios[groupId];
+                console.log(`[AdManager] Grupo ${groupId} removido (sem anúncios restantes).`);
+            }
 
             // Salvar arquivo
+            console.log(`[AdManager] Salvando arquivo ads.json...`);
             await this.saveAdsToFile(adsData);
+            console.log(`[AdManager] ✅ Arquivo salvo com sucesso!`);
 
             // Para o timer local imediatamente
             const timerKey = `local_${adIdToRemove}`;
             if (this.activeTimers.has(timerKey)) {
                 clearInterval(this.activeTimers.get(timerKey).timerId);
                 this.activeTimers.delete(timerKey);
-                console.log(`[AdManager] Timer do anúncio ID ${adIdToRemove} removido.`);
+                console.log(`[AdManager] ✅ Timer do anúncio ID ${adIdToRemove} removido.`);
+            } else {
+                console.log(`[AdManager] ⚠️ Timer ${timerKey} não estava ativo.`);
             }
 
-            await message.reply(`✅ *Anúncio ID ${adIdToRemove} removido com sucesso!*`);
+            await message.reply(`✅ *Anúncio ID ${adIdToRemove} removido com sucesso!*\n\n🗑️ *Deletado permanentemente do arquivo*`);
 
         } catch (error) {
             console.error(`❌ Erro ao remover anúncio ID ${adIdToRemove}:`, error.message);
@@ -261,7 +271,8 @@ class AdManager {
                     const ad = adsData.anuncios[groupId][adId];
                     
                     // Verificar se está ativo (compatibilidade com ambos formatos)
-                    const isActive = ad.active || ad.ativo;
+                    // Se não tem propriedade de ativo, considera ativo por padrão (compatibilidade)
+                    const isActive = ad.active !== false && ad.ativo !== false;
                     
                     if (isActive) {
                         // Normalizar dados para formato padrão
