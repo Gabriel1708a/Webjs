@@ -46,10 +46,42 @@ class PanelHandler {
 
             const groupChat = await this.processGroupJoin(inviteCode);
             
+            // ADICIONE ESTE BLOCO PARA DEPURAR
+            console.log('[PanelHandler] DEBUG: Conteúdo do objeto groupChat:', groupChat);
+            console.log('[PanelHandler] DEBUG: groupChat.name =', groupChat.name);
+            console.log('[PanelHandler] DEBUG: groupChat.id._serialized =', groupChat.id._serialized);
+            
+            if (!groupChat.name) {
+                console.error('[PanelHandler] ERRO CRÍTICO: Não foi possível obter o nome do grupo. groupChat.name é undefined.');
+                console.log('[PanelHandler] Tentando aguardar sincronização e reobter dados do grupo...');
+                
+                // Aguardar um pouco para sincronização
+                await this.delay(2000);
+                
+                try {
+                    // Tentar reobter o chat com dados atualizados
+                    const refreshedChat = await this.client.getChatById(groupChat.id._serialized);
+                    console.log('[PanelHandler] DEBUG: Chat recarregado:', refreshedChat);
+                    console.log('[PanelHandler] DEBUG: Nome após reload:', refreshedChat.name);
+                    
+                    if (refreshedChat.name) {
+                        groupChat.name = refreshedChat.name;
+                        console.log('[PanelHandler] ✅ Nome do grupo obtido após reload:', groupChat.name);
+                    } else {
+                        console.warn('[PanelHandler] ⚠️ Nome ainda não disponível, usando fallback');
+                        groupChat.name = 'Grupo sem nome'; // Fallback
+                    }
+                } catch (reloadError) {
+                    console.error('[PanelHandler] Erro ao recarregar chat:', reloadError.message);
+                    groupChat.name = 'Grupo sem nome'; // Fallback em caso de erro
+                }
+            }
+            // FIM DO BLOCO DE DEBUG
+            
             const groupData = {
                 user_id: user_id,
                 group_id: groupChat.id._serialized,
-                name: groupChat.name, // <-- Campo obrigatório para o painel Laravel
+                name: groupChat.name, // Esta linha agora está mais segura
                 is_active: true,
                 expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
             };
