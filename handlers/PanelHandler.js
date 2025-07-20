@@ -49,7 +49,7 @@ class PanelHandler {
             const groupData = {
                 user_id: user_id,
                 group_id: groupChat.id._serialized,
-                name: groupChat.name,
+                name: groupChat.name, // <-- Campo obrigatório para o painel Laravel
                 is_active: true,
                 expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
             };
