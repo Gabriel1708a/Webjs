@@ -127,85 +127,59 @@ class PanelHandler {
     }
 
     static async processGroupJoin(inviteCode) {
-        console.log(`[PanelHandler] Processando entrada no grupo: ${inviteCode}`);
+        console.log(`[PanelHandler] Processando entrada no grupo (Lógica Yara): ${inviteCode}`);
         
-        // Primeira tentativa: verificar se já está no grupo
         try {
-            console.log(`[PanelHandler] Verificando informações do convite...`);
-            const inviteInfo = await this.client.getInviteInfo(inviteCode);
+            // Passo 1: Tenta entrar no grupo diretamente.
+            // O resultado de acceptInvite é o ID do grupo.
+            const groupId = await this.client.acceptInvite(inviteCode);
+            console.log(`[PanelHandler] ✅ Bot entrou no grupo com sucesso! ID: ${groupId}`);
             
-            if (!inviteInfo || !inviteInfo.id) {
-                throw new Error('Link de convite inválido ou expirado');
-            }
+            // Passo 2: Aguarda um pequeno instante para a sincronização inicial.
+            // Este delay é uma garantia extra.
+            await this.delay(2000); // Espera 2 segundos.
 
-            console.log(`[PanelHandler] Informações do convite obtidas: ${inviteInfo.title || 'Sem nome'}`);
+            // Passo 3: Busca os detalhes do chat usando o ID obtido.
+            const groupChat = await this.client.getChatById(groupId);
             
-            // Verificar se já está no grupo
-            try {
-                const existingChat = await this.client.getChatById(inviteInfo.id._serialized);
-                if (existingChat) {
-                    console.log(`[PanelHandler] Bot já é membro do grupo: ${existingChat.name}`);
-                    return existingChat;
-                }
-            } catch (chatError) {
-                console.log(`[PanelHandler] Bot não é membro do grupo, tentando entrar...`);
+            // Se, mesmo assim, o nome não vier, usamos nosso fallback.
+            if (!groupChat.name) {
+                console.warn(`[PanelHandler] Nome não obtido após entrada. Usando fallback. Chat:`, groupChat);
+                groupChat.name = `Grupo ${groupChat.id.user}`;
             }
-
-            // Tentar entrar no grupo
-            return await this.attemptGroupJoin(inviteCode, inviteInfo);
+            
+            return groupChat;
 
         } catch (error) {
-            console.error(`[PanelHandler] Erro ao processar grupo:`, error);
+            // Se o erro for "já é membro", precisamos tratar isso.
+            if (error.message.includes('already') || error.message.includes('member')) {
+                console.warn(`[PanelHandler] Bot já era membro. Tentando obter informações do convite para pegar o ID.`);
+                
+                // Se já somos membros, não temos o ID. Precisamos obtê-lo pelo código do convite.
+                const inviteInfo = await this.client.getInviteInfo(inviteCode);
+                if (inviteInfo && inviteInfo.id) {
+                    const groupId = inviteInfo.id._serialized;
+                    console.log(`[PanelHandler] ID do grupo existente obtido: ${groupId}`);
+                    const groupChat = await this.client.getChatById(groupId);
+
+                    // Aplica o fallback se necessário
+                    if (!groupChat.name) {
+                        console.warn(`[PanelHandler] Nome não obtido para grupo existente. Usando fallback.`);
+                        groupChat.name = `Grupo ${groupChat.id.user}`;
+                    }
+                    return groupChat;
+                } else {
+                    throw new Error('Já era membro, mas falhou ao obter o ID do grupo pelo convite.');
+                }
+            }
+            
+            // Se for outro tipo de erro, nós o relançamos.
+            console.error(`[PanelHandler] Erro ao processar entrada no grupo:`, error);
             throw error;
         }
     }
 
-    static async attemptGroupJoin(inviteCode, inviteInfo) {
-        const maxRetries = 3;
-        let lastError;
 
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`[PanelHandler] Tentativa ${attempt}/${maxRetries} de entrar no grupo...`);
-                
-                // Aguardar um pouco entre tentativas
-                if (attempt > 1) {
-                    await this.delay(2000 * attempt);
-                }
-
-                const groupId = await this.client.acceptInvite(inviteCode);
-                console.log(`[PanelHandler] ✅ Bot entrou no grupo com sucesso! ID: ${groupId}`);
-                
-                // Aguardar um momento para o WhatsApp processar
-                await this.delay(1000);
-                
-                const groupChat = await this.client.getChatById(groupId);
-                return groupChat;
-
-            } catch (error) {
-                lastError = error;
-                console.warn(`[PanelHandler] Tentativa ${attempt} falhou:`, error.message);
-                
-                // Se for erro de "já é membro", tentar obter o chat diretamente
-                if (error.message.includes('already') || error.message.includes('member')) {
-                    try {
-                        const groupChat = await this.client.getChatById(inviteInfo.id._serialized);
-                        console.log(`[PanelHandler] ✅ Bot já era membro do grupo: ${groupChat.name}`);
-                        return groupChat;
-                    } catch (getChatError) {
-                        console.error(`[PanelHandler] Erro ao obter chat existente:`, getChatError.message);
-                    }
-                }
-
-                // Se for o último retry, lançar o erro
-                if (attempt === maxRetries) {
-                    break;
-                }
-            }
-        }
-
-        throw new Error(`Falha ao entrar no grupo após ${maxRetries} tentativas: ${lastError?.message}`);
-    }
 
     static async sendConfirmationToPanel(groupData) {
         const maxRetries = 3;
