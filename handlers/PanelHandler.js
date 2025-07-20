@@ -40,33 +40,35 @@ class PanelHandler {
             const inviteCode = this.extractInviteCode(group_link);
             console.log(`[PanelHandler] Código de convite extraído: ${inviteCode}`);
 
-            let groupChat = await this.processGroupJoin(inviteCode);
+            // A função processGroupJoin já nos retorna o objeto groupChat e seu ID
+            const groupChat = await this.processGroupJoin(inviteCode);
+            const groupId = groupChat.id._serialized;
             
-            // --- LÓGICA PARA OBTER NOME E FOTO ---
+            // --- LÓGICA FINAL (ESTILO YARA) ---
             let groupName = groupChat.name;
-            let groupIconUrl = null; // Inicia como nulo
+            let groupIconUrl = null;
 
-            // Fallback para o nome, caso ainda falhe
+            // Fallback para o nome
             if (!groupName) {
-                console.warn(`[PanelHandler] ⚠️ Nome não disponível, usando fallback. ID: ${groupChat.id._serialized}`);
+                console.warn(`[PanelHandler] ⚠️ Nome não disponível, usando fallback.`);
                 groupName = `Grupo ${groupChat.id.user}`;
             }
 
-            // Tenta obter a URL da foto do perfil do grupo
+            // Tenta obter a URL da foto DIRETAMENTE DO CLIENT, como o Yara faz
             try {
-                groupIconUrl = await groupChat.getProfilePicUrl();
+                console.log(`[PanelHandler] Buscando foto com client.getProfilePicUrl para o ID: ${groupId}`);
+                groupIconUrl = await this.client.getProfilePicUrl(groupId); // <-- A MUDANÇA CRUCIAL
                 console.log(`[PanelHandler] ✅ URL do ícone do grupo obtida: ${groupIconUrl}`);
             } catch (picError) {
                 console.warn(`[PanelHandler] ⚠️ Não foi possível obter a foto do grupo. Pode não ter uma ou ser privada.`);
-                // Deixa groupIconUrl como null
             }
-            // --- FIM DA LÓGICA ---
+            // --- FIM DA LÓGICA FINAL ---
 
             const groupData = {
                 user_id: user_id,
-                group_id: groupChat.id._serialized,
+                group_id: groupId,
                 name: groupName,
-                icon_url: groupIconUrl, // <-- CAMPO NOVO ADICIONADO
+                icon_url: groupIconUrl,
                 is_active: true,
                 expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
             };
@@ -74,15 +76,13 @@ class PanelHandler {
             console.log('[PanelHandler] Enviando confirmação para o painel Laravel com os dados:', groupData);
             await this.sendConfirmationToPanel(groupData);
 
-            const processingTime = Date.now() - startTime;
-            console.log(`[PanelHandler] ✅ Processamento concluído em ${processingTime}ms`);
+            console.log(`[PanelHandler] ✅ Processamento concluído em ${Date.now() - startTime}ms`);
             
             return res.status(200).json({ 
                 success: true, 
                 message: 'Grupo processado com sucesso.',
                 group_name: groupName,
-                group_id: groupChat.id._serialized,
-                processing_time_ms: processingTime
+                group_id: groupId,
             });
 
         } catch (error) {
