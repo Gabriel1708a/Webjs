@@ -74,14 +74,22 @@ class AdManager {
      */
     static async createAdFromCommand(message, args) {
         if (!args.includes('|')) {
-            return message.reply('❌ *Formato incorreto!*\n\n📝 Use: `!addads mensagem|intervalo`\n\n🔸 Exemplo: `!addads Visite nosso site!|60`\n🔸 O intervalo é em minutos\n\n📷 *Suporte a mídia:*\n• Envie imagem/vídeo com comando na legenda\n• Ou responda mídia com o comando');
+            return message.reply('❌ *Formato incorreto!*\n\n📝 Use: `!addads mensagem|intervalo`\n\n🔸 Exemplos:\n• `!addads Visite nosso site!|60m` (60 minutos)\n• `!addads Promoção especial!|2h` (2 horas)\n• `!addads Oferta limitada!|30` (30 minutos - padrão)\n\n📷 *Suporte a mídia:*\n• Envie imagem/vídeo com comando na legenda\n• Ou responda mídia com o comando');
         }
 
         const [content, intervalStr] = args.split('|').map(s => s.trim());
-        const interval = parseInt(intervalStr);
+        
+        // Extrair número e unidade do intervalo
+        const intervalMatch = intervalStr.match(/^(\d+)([mh]?)$/i);
+        if (!intervalMatch) {
+            return message.reply('❌ *Intervalo inválido!*\n\n✅ Formatos aceitos:\n• `60m` ou `60` (minutos)\n• `2h` (horas)\n• Apenas números positivos');
+        }
 
-        if (!content || !interval || isNaN(interval) || interval < 1) {
-            return message.reply('❌ *Dados inválidos!*\n\n✅ A mensagem e o intervalo (em minutos, maior que 0) são obrigatórios.');
+        const intervalValue = parseInt(intervalMatch[1]);
+        const intervalUnit = intervalMatch[2].toLowerCase() || 'm'; // padrão é minutos
+
+        if (!content || intervalValue < 1) {
+            return message.reply('❌ *Dados inválidos!*\n\n✅ A mensagem e o intervalo (maior que 0) são obrigatórios.');
         }
 
         try {
@@ -121,15 +129,21 @@ class AdManager {
                 console.log(`[AdManager] ✅ Mídia baixada: ${mediaData.mimetype}, tamanho: ${mediaData.data.length} chars`);
             }
 
+            // Converter unidade para formato completo
+            const unitFull = intervalUnit === 'h' ? 'hours' : 'minutes';
+            const unitDisplay = intervalUnit === 'h' ? 'horas' : 'minutos';
+
             // Criar novo anúncio (formato compatível)
             const newAd = {
                 id: adId,
                 mensagem: content, // Compatibilidade com sistema antigo
                 content: content,  // Novo formato
                 group_id: groupId,
-                intervalo: interval, // Compatibilidade com sistema antigo
-                interval: interval,  // Novo formato
-                unit: 'minutes',
+                intervalo: intervalValue, // Compatibilidade com sistema antigo
+                interval: intervalValue,  // Novo formato
+                unit: unitFull, // 'minutes' ou 'hours'
+                unit_display: unitDisplay, // Para exibição em português
+                unit_short: intervalUnit, // 'm' ou 'h'
                 criado: new Date().toISOString(), // Compatibilidade com sistema antigo
                 created_at: new Date().toISOString(),
                 ativo: true, // Compatibilidade com sistema antigo
@@ -153,7 +167,7 @@ class AdManager {
             await this.syncWithAdsFile();
 
             const tipoMidia = mediaData ? `📷 ${mediaData.mimetype.includes('video') ? 'Vídeo' : 'Imagem'}` : '📝 Texto';
-            await message.reply(`✅ *Anúncio criado com sucesso!*\n\n📢 ID: *${adId}*\n⏰ Intervalo: *${interval} minutos*\n${tipoMidia}\n📝 Mensagem: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}\n🚀 O anúncio começará a ser enviado em breve!`);
+            await message.reply(`✅ *Anúncio criado com sucesso!*\n\n📢 ID: *${adId}*\n⏰ Intervalo: *${intervalValue} ${unitDisplay}*\n${tipoMidia}\n📝 Mensagem: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}\n🚀 O anúncio começará a ser enviado em breve!`);
 
         } catch (error) {
             console.error('❌ Erro ao criar anúncio:', error.message);
@@ -190,11 +204,21 @@ class AdManager {
                         const createdAt = ad.created_at || ad.criado;
                         const hasMedia = ad.media || ad.full_media_url;
                         
+                        // Determinar unidade de exibição
+                        let unitDisplay = 'minutos'; // padrão
+                        if (ad.unit_display) {
+                            unitDisplay = ad.unit_display;
+                        } else if (ad.unit === 'hours') {
+                            unitDisplay = 'horas';
+                        } else if (ad.unit_short === 'h') {
+                            unitDisplay = 'horas';
+                        }
+                        
                         const tipoIcon = hasMedia ? '🖼️ Mídia' : '📝 Texto';
                         const status = this.activeTimers.has(`local_${adId}`) ? '🟢 Ativo' : '🔴 Parado';
                         
                         listText += `🆔 *ID:* ${adId}\n`;
-                        listText += `⏰ *Intervalo:* ${interval} minutos\n`;
+                        listText += `⏰ *Intervalo:* ${interval} ${unitDisplay}\n`;
                         listText += `${tipoIcon} ${status}\n`;
                         listText += `💬 *Mensagem:* ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}\n`;
                         
