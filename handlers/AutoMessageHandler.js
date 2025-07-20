@@ -175,17 +175,25 @@ class AutoMessageHandler {
 
     /**
      * Envia a mensagem usando o módulo Sender centralizado.
-     * @param {object} messageData - Os dados da mensagem.
+     * @param {object} messageData - Os dados da mensagem, que agora devem incluir 'group_id'.
      */
     static async sendMessage(messageData) {
-        const targetGroupId = '120363402144363977@g.us'; // SEU ID DE GRUPO
+        // --- A MUDANÇA ESTÁ AQUI ---
+        // Removemos o ID fixo e usamos o que vem da API.
+        const targetGroupId = messageData.group_id; 
 
-        console.log(`🚀 Preparando para enviar mensagem ID ${messageData.id} via Sender...`);
+        // Verificação de segurança: se por algum motivo o group_id não vier, abortamos.
+        if (!targetGroupId) {
+            console.error(`❌ ERRO CRÍTICO: Tentativa de enviar mensagem ID ${messageData.id} sem um group_id. Verifique sua API.`);
+            return; // Não continua se não souber para onde enviar.
+        }
+
+        console.log(`🚀 Preparando para enviar mensagem ID ${messageData.id} para o grupo ${targetGroupId}...`);
 
         const success = await Sender.sendMessage(
-            targetGroupId,
+            targetGroupId, // <-- Usamos a variável dinâmica
             messageData.content,
-            messageData.full_media_url // Passa a URL da mídia, ou null se não houver
+            messageData.full_media_url
         );
 
         if (success) {
