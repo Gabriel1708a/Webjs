@@ -213,9 +213,25 @@ class AdManager {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}`, 'Accept': 'application/json' }
             });
 
+            // Debug: Mostrar estrutura da resposta
+            console.log('🔍 [AdManager] Estrutura da resposta:', {
+                'response.data existe?': !!response.data,
+                'response.data.data existe?': !!(response.data && response.data.data),
+                'response.data.data é array?': Array.isArray(response.data && response.data.data),
+                'Tipo de response.data': typeof response.data,
+                'Tipo de response.data.data': typeof (response.data && response.data.data)
+            });
+
             // 👇👇👇 ESTA É A LINHA CORRIGIDA E MAIS IMPORTANTE 👇👇👇
             // Acessamos response.data.data e garantimos que seja um array com `|| []`
             const panelMessages = response.data.data || [];
+
+            // Verificação extra de segurança
+            if (!Array.isArray(panelMessages)) {
+                console.error('❌ [AdManager] ERRO: panelMessages não é um array:', typeof panelMessages, panelMessages);
+                console.error('❌ [AdManager] Resposta completa da API:', JSON.stringify(response.data, null, 2));
+                return; // Sai da função para evitar erro
+            }
 
             console.log(`[AdManager] ${panelMessages.length} anúncios encontrados no painel.`);
 
