@@ -74,7 +74,7 @@ class AdManager {
      */
     static async createAdFromCommand(message, args) {
         if (!args.includes('|')) {
-            return message.reply('❌ *Formato incorreto!*\n\n📝 Use: `!addads mensagem|intervalo`\n\n🔸 Exemplo: `!addads Visite nosso site!|60`\n🔸 O intervalo é em minutos.');
+            return message.reply('❌ *Formato incorreto!*\n\n📝 Use: `!addads mensagem|intervalo`\n\n🔸 Exemplo: `!addads Visite nosso site!|60`\n🔸 O intervalo é em minutos\n\n📷 *Suporte a mídia:*\n• Envie imagem/vídeo com comando na legenda\n• Ou responda mídia com o comando');
         }
 
         const [content, intervalStr] = args.split('|').map(s => s.trim());
@@ -96,6 +96,31 @@ class AdManager {
             adsData.counters[groupId]++;
             const adId = adsData.counters[groupId].toString();
 
+            let mediaData = null;
+
+            // Verificar se há mídia (igual ao sistema antigo)
+            let mediaMessage = null;
+            if (message.hasMedia) {
+                mediaMessage = message;
+            } else if (message.hasQuotedMsg) {
+                const quotedMsg = await message.getQuotedMessage();
+                if (quotedMsg.hasMedia) {
+                    mediaMessage = quotedMsg;
+                }
+            }
+
+            // Se há mídia, baixar e salvar (igual ao sistema antigo)
+            if (mediaMessage) {
+                console.log(`[AdManager] Baixando mídia para anúncio ID ${adId}...`);
+                const media = await mediaMessage.downloadMedia();
+                mediaData = {
+                    data: media.data,
+                    mimetype: media.mimetype,
+                    filename: media.filename || `anuncio_${adId}.${media.mimetype.split('/')[1]}`
+                };
+                console.log(`[AdManager] ✅ Mídia baixada: ${mediaData.mimetype}, tamanho: ${mediaData.data.length} chars`);
+            }
+
             // Criar novo anúncio (formato compatível)
             const newAd = {
                 id: adId,
@@ -109,8 +134,8 @@ class AdManager {
                 created_at: new Date().toISOString(),
                 ativo: true, // Compatibilidade com sistema antigo
                 active: true, // Novo formato
-                tipo: 'texto',
-                media: null
+                tipo: mediaData ? 'midia' : 'texto', // Tipo correto baseado na mídia
+                media: mediaData // Dados da mídia salvos
             };
 
             // Adicionar ao arquivo
@@ -127,7 +152,8 @@ class AdManager {
             // Força uma sincronização para o anúncio começar a rodar imediatamente
             await this.syncWithAdsFile();
 
-            await message.reply(`✅ *Anúncio criado com sucesso!*\n\n📢 ID: *${adId}*\n⏰ Intervalo: *${interval} minutos*\n🚀 O anúncio começará a ser enviado em breve!`);
+            const tipoMidia = mediaData ? `📷 ${mediaData.mimetype.includes('video') ? 'Vídeo' : 'Imagem'}` : '📝 Texto';
+            await message.reply(`✅ *Anúncio criado com sucesso!*\n\n📢 ID: *${adId}*\n⏰ Intervalo: *${interval} minutos*\n${tipoMidia}\n📝 Mensagem: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}\n🚀 O anúncio começará a ser enviado em breve!`);
 
         } catch (error) {
             console.error('❌ Erro ao criar anúncio:', error.message);
@@ -351,21 +377,43 @@ class AdManager {
         }
 
         try {
+            const content = adData.content || adData.mensagem;
             console.log(`🚀 [AdManager] Enviando anúncio ID ${adData.id} para o grupo ${adData.group_id}...`);
             
-            // Enviar mensagem usando o Sender
-            const success = await Sender.sendMessage(
-                this.client,
-                adData.group_id,
-                adData.content,
-                adData.full_media_url || null // URL da mídia se existir
-            );
-
-            if (success) {
-                console.log(`✅ [AdManager] Anúncio ID ${adData.id} enviado com sucesso!`);
+            // Verificar se há mídia salva (formato antigo)
+            if (adData.media && adData.media.data) {
+                console.log(`📷 [AdManager] Enviando anúncio com mídia: ${adData.media.mimetype}`);
+                
+                // Recriar MessageMedia para envio (igual ao sistema antigo)
+                const { MessageMedia } = require('whatsapp-web.js');
+                const media = new MessageMedia(adData.media.mimetype, adData.media.data, adData.media.filename);
+                
+                await this.client.sendMessage(adData.group_id, media, { caption: content });
+                console.log(`✅ [AdManager] Anúncio com mídia ID ${adData.id} enviado com sucesso!`);
+                
+            } else if (adData.full_media_url) {
+                // Usar Sender para URLs de mídia (novo formato)
+                console.log(`🌐 [AdManager] Enviando anúncio com mídia via URL: ${adData.full_media_url}`);
+                const success = await Sender.sendMessage(
+                    this.client,
+                    adData.group_id,
+                    content,
+                    adData.full_media_url
+                );
+                
+                if (success) {
+                    console.log(`✅ [AdManager] Anúncio via URL ID ${adData.id} enviado com sucesso!`);
+                } else {
+                    console.error(`❌ [AdManager] Falha ao enviar anúncio via URL ID ${adData.id}`);
+                }
+                
             } else {
-                console.error(`❌ [AdManager] Falha ao enviar anúncio ID ${adData.id}`);
+                // Enviar apenas texto
+                console.log(`📝 [AdManager] Enviando anúncio de texto`);
+                await this.client.sendMessage(adData.group_id, content);
+                console.log(`✅ [AdManager] Anúncio de texto ID ${adData.id} enviado com sucesso!`);
             }
+
         } catch (error) {
             console.error(`❌ [AdManager] Erro ao enviar anúncio ID ${adData.id}:`, error);
         }
