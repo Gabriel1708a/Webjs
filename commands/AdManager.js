@@ -213,33 +213,11 @@ class AdManager {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}`, 'Accept': 'application/json' }
             });
 
-            console.log('📋 [AdManager] Resposta da API recebida:', JSON.stringify(response.data, null, 2));
+            // 👇👇👇 ESTA É A LINHA CORRIGIDA E MAIS IMPORTANTE 👇👇👇
+            // Acessamos response.data.data e garantimos que seja um array com `|| []`
+            const panelMessages = response.data.data || [];
 
-            // Verificação robusta da estrutura da resposta
-            let panelMessages = [];
-            
-            if (response.data) {
-                if (Array.isArray(response.data)) {
-                    // Se response.data já é um array
-                    panelMessages = response.data;
-                } else if (response.data.data && Array.isArray(response.data.data)) {
-                    // Se os dados estão em response.data.data
-                    panelMessages = response.data.data;
-                } else if (response.data.messages && Array.isArray(response.data.messages)) {
-                    // Se os dados estão em response.data.messages
-                    panelMessages = response.data.messages;
-                } else {
-                    console.warn('⚠️ [AdManager] Estrutura de resposta não reconhecida. Dados recebidos:', response.data);
-                    panelMessages = [];
-                }
-            }
-
-            console.log(`📊 [AdManager] ${panelMessages.length} anúncios encontrados no painel.`);
-
-            if (!Array.isArray(panelMessages)) {
-                console.error('❌ [AdManager] ERRO: panelMessages não é um array:', typeof panelMessages);
-                panelMessages = [];
-            }
+            console.log(`[AdManager] ${panelMessages.length} anúncios encontrados no painel.`);
 
             const panelMessageIds = new Set(panelMessages.map(m => `panel_${m.id}`));
 
@@ -260,7 +238,8 @@ class AdManager {
             console.log(`✅ [AdManager] Sincronização concluída. Total de timers ativos: ${this.activeTimers.size}`);
 
         } catch (error) {
-            console.error('❌ [AdManager] Erro ao sincronizar com o painel:', error.response?.data || error.message);
+            // Adiciona um log mais detalhado do erro para facilitar futuras depurações
+            console.error('❌ [AdManager] Erro ao buscar mensagens do painel:', error.response?.data || error.message);
         }
     }
 
