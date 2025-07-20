@@ -29,81 +29,67 @@ class PanelHandler {
         console.log(`[PanelHandler] 🚀 Recebida solicitação para grupo: ${group_link} | Usuário ID: ${user_id}`);
 
         if (!group_link || !user_id) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'group_link e user_id são obrigatórios.' 
-            });
+            return res.status(400).json({ success: false, message: 'group_link e user_id são obrigatórios.' });
         }
 
         try {
-            // Validar se o cliente está pronto
             if (!this.client || !await this.isClientReady()) {
                 throw new Error('Cliente WhatsApp não está pronto');
             }
 
-            let inviteCode = this.extractInviteCode(group_link);
+            const inviteCode = this.extractInviteCode(group_link);
             console.log(`[PanelHandler] Código de convite extraído: ${inviteCode}`);
 
-            const groupChat = await this.processGroupJoin(inviteCode);
+            let groupChat = await this.processGroupJoin(inviteCode);
             
-            // ADICIONE ESTE BLOCO PARA DEPURAR
-            console.log('[PanelHandler] DEBUG: Conteúdo do objeto groupChat:', groupChat);
-            console.log('[PanelHandler] DEBUG: groupChat.name =', groupChat.name);
-            console.log('[PanelHandler] DEBUG: groupChat.id._serialized =', groupChat.id._serialized);
-            
-            if (!groupChat.name) {
-                console.error('[PanelHandler] ERRO CRÍTICO: Não foi possível obter o nome do grupo. groupChat.name é undefined.');
-                console.log('[PanelHandler] Tentando aguardar sincronização e reobter dados do grupo...');
-                
-                // Aguardar um pouco para sincronização
-                await this.delay(2000);
-                
+            // --- LÓGICA NOVA E ROBUSTA PARA OBTER O NOME ---
+            let groupName = groupChat.name;
+
+            // Se o nome não veio na primeira tentativa, vamos forçar um "reload" dos dados.
+            if (!groupName) {
+                console.warn('[PanelHandler] Nome do grupo veio como undefined. Tentando recarregar os dados do chat...');
                 try {
-                    // Tentar reobter o chat com dados atualizados
-                    const refreshedChat = await this.client.getChatById(groupChat.id._serialized);
-                    console.log('[PanelHandler] DEBUG: Chat recarregado:', refreshedChat);
-                    console.log('[PanelHandler] DEBUG: Nome após reload:', refreshedChat.name);
-                    
-                    if (refreshedChat.name) {
-                        groupChat.name = refreshedChat.name;
-                        console.log('[PanelHandler] ✅ Nome do grupo obtido após reload:', groupChat.name);
-                    } else {
-                        console.warn('[PanelHandler] ⚠️ Nome ainda não disponível, usando fallback');
-                        groupChat.name = 'Grupo sem nome'; // Fallback
-                    }
+                    // O método .reload() foi feito para isso, mas pode não ser 100% confiável.
+                    await groupChat.reload(); 
+                    groupName = groupChat.name; // Tenta pegar o nome de novo
+                    console.log(`[PanelHandler] DEBUG: Nome após reload: ${groupName}`);
                 } catch (reloadError) {
-                    console.error('[PanelHandler] Erro ao recarregar chat:', reloadError.message);
-                    groupChat.name = 'Grupo sem nome'; // Fallback em caso de erro
+                    console.error('[PanelHandler] Erro ao tentar recarregar o chat:', reloadError.message);
                 }
             }
-            // FIM DO BLOCO DE DEBUG
-            
+
+            // --- PLANO B (FALLBACK) ---
+            // Se, mesmo depois de tudo, o nome ainda não existir, usamos um nome padrão.
+            if (!groupName) {
+                console.warn(`[PanelHandler] ⚠️ Nome ainda não disponível, usando fallback. ID do Grupo: ${groupChat.id._serialized}`);
+                groupName = `Grupo ${groupChat.id.user}`; // Ex: "Grupo 12036329..."
+            }
+            // --- FIM DA NOVA LÓGICA ---
+
             const groupData = {
                 user_id: user_id,
                 group_id: groupChat.id._serialized,
-                name: groupChat.name, // Esta linha agora está mais segura
+                name: groupName, // Usamos a variável segura que SEMPRE terá um valor
                 is_active: true,
                 expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
             };
 
-            console.log('[PanelHandler] Enviando confirmação para o painel Laravel...');
+            console.log('[PanelHandler] Enviando confirmação para o painel Laravel com os dados:', groupData);
             await this.sendConfirmationToPanel(groupData);
 
             const processingTime = Date.now() - startTime;
-            console.log(`[PanelHandler] ⚡ Processamento concluído em ${processingTime}ms`);
+            console.log(`[PanelHandler] ✅ Processamento concluído em ${processingTime}ms`);
             
             return res.status(200).json({ 
                 success: true, 
                 message: 'Grupo processado com sucesso.',
-                group_name: groupChat.name,
+                group_name: groupName,
                 group_id: groupChat.id._serialized,
                 processing_time_ms: processingTime
             });
 
         } catch (error) {
             console.error('[PanelHandler] Erro no processamento do grupo:', error);
-            
-            // Determinar o tipo de erro e resposta apropriada
             const errorResponse = this.getErrorResponse(error);
             return res.status(errorResponse.status).json({
                 success: false,
