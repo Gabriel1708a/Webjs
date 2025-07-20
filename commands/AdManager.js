@@ -89,18 +89,28 @@ class AdManager {
             const adsData = await this.loadAdsFromFile();
             const groupId = message.from;
 
-            // Gerar ID único para o anúncio
-            const adId = Date.now().toString();
+            // Gerar ID sequencial (compatível com sistema antigo)
+            if (!adsData.counters) adsData.counters = {};
+            if (!adsData.counters[groupId]) adsData.counters[groupId] = 0;
+            
+            adsData.counters[groupId]++;
+            const adId = adsData.counters[groupId].toString();
 
-            // Criar novo anúncio
+            // Criar novo anúncio (formato compatível)
             const newAd = {
                 id: adId,
+                mensagem: content, // Compatibilidade com sistema antigo
+                content: content,  // Novo formato
                 group_id: groupId,
-                content: content,
-                interval: interval,
+                intervalo: interval, // Compatibilidade com sistema antigo
+                interval: interval,  // Novo formato
                 unit: 'minutes',
+                criado: new Date().toISOString(), // Compatibilidade com sistema antigo
                 created_at: new Date().toISOString(),
-                active: true
+                ativo: true, // Compatibilidade com sistema antigo
+                active: true, // Novo formato
+                tipo: 'texto',
+                media: null
             };
 
             // Adicionar ao arquivo
@@ -140,16 +150,31 @@ class AdManager {
             if (adsData.anuncios[groupId]) {
                 Object.keys(adsData.anuncios[groupId]).forEach(adId => {
                     const ad = adsData.anuncios[groupId][adId];
-                    if (ad.active) {
+                    
+                    // Verificar se está ativo (compatibilidade com ambos formatos)
+                    const isActive = ad.active || ad.ativo;
+                    
+                    if (isActive) {
                         foundAds = true;
-                        const tipoIcon = ad.full_media_url ? '🖼️ Mídia' : '📝 Texto';
+                        
+                        // Usar dados compatíveis com ambos formatos
+                        const content = ad.content || ad.mensagem;
+                        const interval = ad.interval || ad.intervalo;
+                        const createdAt = ad.created_at || ad.criado;
+                        const hasMedia = ad.media || ad.full_media_url;
+                        
+                        const tipoIcon = hasMedia ? '🖼️ Mídia' : '📝 Texto';
                         const status = this.activeTimers.has(`local_${adId}`) ? '🟢 Ativo' : '🔴 Parado';
                         
                         listText += `🆔 *ID:* ${adId}\n`;
-                        listText += `⏰ *Intervalo:* ${ad.interval} ${ad.unit}\n`;
+                        listText += `⏰ *Intervalo:* ${interval} minutos\n`;
                         listText += `${tipoIcon} ${status}\n`;
-                        listText += `💬 *Mensagem:* ${ad.content.substring(0, 50)}${ad.content.length > 50 ? '...' : ''}\n`;
-                        listText += `📅 *Criado:* ${new Date(ad.created_at).toLocaleString('pt-BR')}\n`;
+                        listText += `💬 *Mensagem:* ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}\n`;
+                        
+                        if (createdAt) {
+                            listText += `📅 *Criado:* ${new Date(createdAt).toLocaleString('pt-BR')}\n`;
+                        }
+                        
                         listText += `━━━━━━━━━━━━━━━━━━\n\n`;
                     }
                 });
@@ -185,13 +210,18 @@ class AdManager {
                 return message.reply(`❌ *Anúncio ID ${adIdToRemove} não encontrado neste grupo!*\n\n💡 Use \`!listads\` para ver os anúncios disponíveis.`);
             }
 
-            // Remover do arquivo
-            delete adsData.anuncios[groupId][adIdToRemove];
+            // Marcar como inativo ao invés de deletar (compatibilidade)
+            const ad = adsData.anuncios[groupId][adIdToRemove];
+            ad.ativo = false;
+            ad.active = false;
 
-            // Se não há mais anúncios no grupo, remover o grupo também
-            if (Object.keys(adsData.anuncios[groupId]).length === 0) {
-                delete adsData.anuncios[groupId];
-            }
+            // Verificar se há anúncios ativos restantes no grupo
+            const activeAdsInGroup = Object.keys(adsData.anuncios[groupId]).filter(id => {
+                const adData = adsData.anuncios[groupId][id];
+                return adData.ativo || adData.active;
+            });
+
+            // Se não há anúncios ativos, não remover o grupo (manter histórico)
 
             // Salvar arquivo
             await this.saveAdsToFile(adsData);
@@ -225,12 +255,27 @@ class AdManager {
             const adsData = await this.loadAdsFromFile();
             const localMessages = [];
 
-            // Converter estrutura do arquivo para array
+            // Converter estrutura do arquivo para array (compatível com formato antigo)
             Object.keys(adsData.anuncios).forEach(groupId => {
                 Object.keys(adsData.anuncios[groupId]).forEach(adId => {
                     const ad = adsData.anuncios[groupId][adId];
-                    if (ad.active) {
-                        localMessages.push(ad);
+                    
+                    // Verificar se está ativo (compatibilidade com ambos formatos)
+                    const isActive = ad.active || ad.ativo;
+                    
+                    if (isActive) {
+                        // Normalizar dados para formato padrão
+                        const normalizedAd = {
+                            id: ad.id || adId,
+                            group_id: groupId,
+                            content: ad.content || ad.mensagem,
+                            interval: ad.interval || ad.intervalo,
+                            unit: ad.unit || 'minutes',
+                            full_media_url: null, // Para compatibilidade
+                            // Manter dados originais também
+                            ...ad
+                        };
+                        localMessages.push(normalizedAd);
                     }
                 });
             });
@@ -341,10 +386,61 @@ class AdManager {
         try {
             await this.ensureAdsFileExists();
             const data = await fs.readJson(config.adsFilePath);
+            
+            // Migrar dados antigos se necessário
+            await this.migrateOldData(data);
+            
             return data;
         } catch (error) {
             console.error('[AdManager] Erro ao carregar ads.json:', error.message);
             return { anuncios: {} };
+        }
+    }
+
+    /**
+     * Migra dados do formato antigo para compatibilidade
+     */
+    static async migrateOldData(data) {
+        try {
+            let needsSave = false;
+
+            // Garantir que counters existe
+            if (!data.counters) {
+                data.counters = {};
+                needsSave = true;
+            }
+
+            // Verificar cada grupo e garantir contador correto
+            if (data.anuncios) {
+                Object.keys(data.anuncios).forEach(groupId => {
+                    const groupAds = data.anuncios[groupId];
+                    
+                    // Encontrar o maior ID existente para este grupo
+                    let maxId = 0;
+                    Object.keys(groupAds).forEach(adId => {
+                        const numId = parseInt(adId);
+                        if (!isNaN(numId) && numId > maxId) {
+                            maxId = numId;
+                        }
+                    });
+
+                    // Definir contador se não existe ou está desatualizado
+                    if (!data.counters[groupId] || data.counters[groupId] < maxId) {
+                        data.counters[groupId] = maxId;
+                        needsSave = true;
+                        console.log(`[AdManager] Contador do grupo ${groupId} atualizado para ${maxId}`);
+                    }
+                });
+            }
+
+            // Salvar se houve mudanças
+            if (needsSave) {
+                await this.saveAdsToFile(data);
+                console.log('[AdManager] Dados migrados com sucesso!');
+            }
+
+        } catch (error) {
+            console.error('[AdManager] Erro ao migrar dados:', error.message);
         }
     }
 
