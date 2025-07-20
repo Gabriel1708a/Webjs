@@ -1,4 +1,6 @@
 const axios = require('axios');
+const fs = require('fs-extra');
+const path = require('path');
 const { MessageMedia } = require('whatsapp-web.js');
 
 // Ajuste os caminhos para apontar para os arquivos corretos a partir da pasta 'commands'
@@ -7,13 +9,9 @@ const { Utils } = require('../utils/Utils'); // Supondo que Utils.js esteja em u
 const Sender = require('../Sender'); // Supondo que Sender.js esteja na raiz
 
 // --- CONFIGURAÇÃO CENTRALIZADA ---
-// É uma boa prática usar variáveis de ambiente (.env) para isso
 const config = {
-    laravelApi: {
-        baseUrl: process.env.LARAVEL_API_BASE_URL || 'https://painel.botwpp.tech/api',
-        token: process.env.LARAVEL_API_TOKEN || 'teste'
-    },
-    syncIntervalSeconds: 15 // Intervalo para sincronizar com o painel (em segundos)
+    adsFilePath: path.join(__dirname, '../data/ads.json'), // Caminho para o arquivo ads.json
+    syncIntervalSeconds: 15 // Intervalo para sincronizar com o arquivo local (em segundos)
 };
 
 class AdManager {
@@ -26,29 +24,23 @@ class AdManager {
      * Começa a sincronização com o painel.
      */
     static async initialize(client) {
-        console.log('📢 [AdManager] Iniciando serviço unificado de anúncios...');
+        console.log('📢 [AdManager] Iniciando serviço de anúncios (arquivo local)...');
         this.client = client; // Armazena a instância do cliente para uso posterior
 
-        // Verificar configuração da API
-        console.log('🔧 [AdManager] Configuração da API:', {
-            baseUrl: config.laravelApi.baseUrl,
-            token: config.laravelApi.token ? '***TOKEN_CONFIGURADO***' : '❌ TOKEN_NÃO_CONFIGURADO',
+        // Verificar se o arquivo ads.json existe
+        console.log('🔧 [AdManager] Configuração:', {
+            adsFilePath: config.adsFilePath,
             syncInterval: config.syncIntervalSeconds + 's'
         });
 
-        if (!config.laravelApi.baseUrl || config.laravelApi.baseUrl === 'https://painel.botwpp.tech/api') {
-            console.warn('⚠️ [AdManager] ATENÇÃO: URL da API não configurada ou usando valor padrão.');
-        }
+        // Criar arquivo ads.json se não existir
+        await this.ensureAdsFileExists();
 
-        if (!config.laravelApi.token || config.laravelApi.token === 'teste') {
-            console.warn('⚠️ [AdManager] ATENÇÃO: Token da API não configurado ou usando valor padrão.');
-        }
-
-        // Inicia a sincronização periódica com o painel Laravel
-        setInterval(() => this.syncWithPanel(), config.syncIntervalSeconds * 1000);
+        // Inicia a sincronização periódica com o arquivo local
+        setInterval(() => this.syncWithAdsFile(), config.syncIntervalSeconds * 1000);
         
         // Realiza a primeira sincronização imediatamente
-        await this.syncWithPanel();
+        await this.syncWithAdsFile();
     }
 
     //================================================================================
@@ -93,46 +85,43 @@ class AdManager {
         }
 
         try {
-            // NOTA: O envio de mídia via comando para a API é complexo.
-            // O bot precisaria fazer upload do arquivo para o Laravel.
-            // Por enquanto, este comando criará apenas anúncios de texto no painel.
-            // Anúncios com mídia devem ser criados diretamente no painel.
+            // Carregar anúncios existentes
+            const adsData = await this.loadAdsFromFile();
+            const groupId = message.from;
 
-            const adPayload = {
-                group_id: message.from,
+            // Gerar ID único para o anúncio
+            const adId = Date.now().toString();
+
+            // Criar novo anúncio
+            const newAd = {
+                id: adId,
+                group_id: groupId,
                 content: content,
                 interval: interval,
-                unit: 'minutes', // O comando local sempre usa minutos
+                unit: 'minutes',
+                created_at: new Date().toISOString(),
+                active: true
             };
 
-            console.log(`[AdManager] Enviando novo anúncio para o painel Laravel...`);
-            const response = await axios.post(`${config.laravelApi.baseUrl}/messages`, adPayload, {
-                headers: { 'Authorization': `Bearer ${config.laravelApi.token}`, 'Accept': 'application/json' }
-            });
-
-            console.log('📋 [AdManager] Resposta da criação do anúncio:', JSON.stringify(response.data, null, 2));
-
-            // Verificação robusta da resposta de criação
-            let newAdFromPanel = null;
-            if (response.data) {
-                if (response.data.data) {
-                    newAdFromPanel = response.data.data;
-                } else if (response.data.id) {
-                    newAdFromPanel = response.data;
-                } else {
-                    console.warn('⚠️ [AdManager] Estrutura de resposta de criação não reconhecida:', response.data);
-                    newAdFromPanel = { id: 'unknown' };
-                }
+            // Adicionar ao arquivo
+            if (!adsData.anuncios[groupId]) {
+                adsData.anuncios[groupId] = {};
             }
-            
-            // Força uma sincronização para o anúncio começar a rodar imediatamente.
-            await this.syncWithPanel();
+            adsData.anuncios[groupId][adId] = newAd;
 
-            await message.reply(`✅ *Anúncio criado e enviado ao painel!*\n\n📢 ID do Painel: *${newAdFromPanel.id}*\n⏰ Ele começará a ser enviado em breve, conforme o agendamento.`);
+            // Salvar arquivo
+            await this.saveAdsToFile(adsData);
+
+            console.log(`[AdManager] Novo anúncio criado no arquivo local - ID: ${adId}`);
+            
+            // Força uma sincronização para o anúncio começar a rodar imediatamente
+            await this.syncWithAdsFile();
+
+            await message.reply(`✅ *Anúncio criado com sucesso!*\n\n📢 ID: *${adId}*\n⏰ Intervalo: *${interval} minutos*\n🚀 O anúncio começará a ser enviado em breve!`);
 
         } catch (error) {
-            console.error('❌ Erro ao criar anúncio via comando:', error.response?.data || error.message);
-            await message.reply('❌ Erro ao sincronizar anúncio com o painel. Verifique os logs e a API.');
+            console.error('❌ Erro ao criar anúncio:', error.message);
+            await message.reply('❌ Erro ao criar anúncio. Verifique os logs.');
         }
     }
 
@@ -141,34 +130,40 @@ class AdManager {
      */
     static async listAllAds(message) {
         const groupId = message.from;
-        let listText = '📢 *ANÚNCIOS ATIVOS (Sincronizados):*\n\n';
+        let listText = '📢 *ANÚNCIOS ATIVOS (Arquivo Local):*\n\n';
         let foundAds = false;
 
-        if (this.activeTimers.size === 0) {
-            return message.reply('📭 *Nenhum anúncio ativo no momento.*');
-        }
-
-        this.activeTimers.forEach((timerData, uniqueId) => {
-            // Mostra apenas anúncios do grupo que pediu a lista
-            if (timerData.group_id === groupId) {
-                foundAds = true;
-                const source = timerData.source === 'panel' ? '🌐 Painel' : '📱 Local';
-                const id = timerData.id;
-                const tipoIcon = timerData.full_media_url ? '🖼️ Mídia' : '📝 Texto';
-                
-                listText += `🆔 *ID:* ${id} (${source})\n`;
-                listText += `⏰ *Intervalo:* ${timerData.interval} ${timerData.unit}\n`;
-                listText += `${tipoIcon}\n`;
-                listText += `💬 *Mensagem:* ${timerData.content.substring(0, 50)}...\n`;
-                listText += `━━━━━━━━━━━━━━━━━━\n\n`;
+        try {
+            // Carregar anúncios do arquivo
+            const adsData = await this.loadAdsFromFile();
+            
+            if (adsData.anuncios[groupId]) {
+                Object.keys(adsData.anuncios[groupId]).forEach(adId => {
+                    const ad = adsData.anuncios[groupId][adId];
+                    if (ad.active) {
+                        foundAds = true;
+                        const tipoIcon = ad.full_media_url ? '🖼️ Mídia' : '📝 Texto';
+                        const status = this.activeTimers.has(`local_${adId}`) ? '🟢 Ativo' : '🔴 Parado';
+                        
+                        listText += `🆔 *ID:* ${adId}\n`;
+                        listText += `⏰ *Intervalo:* ${ad.interval} ${ad.unit}\n`;
+                        listText += `${tipoIcon} ${status}\n`;
+                        listText += `💬 *Mensagem:* ${ad.content.substring(0, 50)}${ad.content.length > 50 ? '...' : ''}\n`;
+                        listText += `📅 *Criado:* ${new Date(ad.created_at).toLocaleString('pt-BR')}\n`;
+                        listText += `━━━━━━━━━━━━━━━━━━\n\n`;
+                    }
+                });
             }
-        });
 
-        if (!foundAds) {
-            listText = `📭 *Nenhum anúncio ativo para este grupo.*`;
+            if (!foundAds) {
+                listText = `📭 *Nenhum anúncio ativo para este grupo.*\n\n💡 Use \`!addads mensagem|intervalo\` para criar um anúncio.`;
+            }
+
+            await message.reply(listText);
+        } catch (error) {
+            console.error('[AdManager] Erro ao listar anúncios:', error.message);
+            await message.reply('❌ Erro ao carregar lista de anúncios. Verifique os logs.');
         }
-
-        await message.reply(listText);
     }
 
     /**
@@ -181,96 +176,87 @@ class AdManager {
         }
 
         try {
-            console.log(`[AdManager] Enviando solicitação de remoção para o painel (ID: ${adIdToRemove})...`);
-            await axios.delete(`${config.laravelApi.baseUrl}/messages/${adIdToRemove}`, {
-                headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
-            });
+            // Carregar anúncios existentes
+            const adsData = await this.loadAdsFromFile();
+            const groupId = message.from;
 
-            // Para o timer local imediatamente para não esperar a próxima sincronização
-            const timerKey = `panel_${adIdToRemove}`;
+            // Verificar se o anúncio existe neste grupo
+            if (!adsData.anuncios[groupId] || !adsData.anuncios[groupId][adIdToRemove]) {
+                return message.reply(`❌ *Anúncio ID ${adIdToRemove} não encontrado neste grupo!*\n\n💡 Use \`!listads\` para ver os anúncios disponíveis.`);
+            }
+
+            // Remover do arquivo
+            delete adsData.anuncios[groupId][adIdToRemove];
+
+            // Se não há mais anúncios no grupo, remover o grupo também
+            if (Object.keys(adsData.anuncios[groupId]).length === 0) {
+                delete adsData.anuncios[groupId];
+            }
+
+            // Salvar arquivo
+            await this.saveAdsToFile(adsData);
+
+            // Para o timer local imediatamente
+            const timerKey = `local_${adIdToRemove}`;
             if (this.activeTimers.has(timerKey)) {
                 clearInterval(this.activeTimers.get(timerKey).timerId);
                 this.activeTimers.delete(timerKey);
+                console.log(`[AdManager] Timer do anúncio ID ${adIdToRemove} removido.`);
             }
 
-            await message.reply(`✅ *Solicitação de remoção para o anúncio ID ${adIdToRemove} enviada com sucesso!*`);
+            await message.reply(`✅ *Anúncio ID ${adIdToRemove} removido com sucesso!*`);
 
         } catch (error) {
-            console.error(`❌ Erro ao remover anúncio ID ${adIdToRemove}:`, error.response?.data || error.message);
-            await message.reply(`❌ Falha ao remover o anúncio. Verifique se o ID está correto.`);
+            console.error(`❌ Erro ao remover anúncio ID ${adIdToRemove}:`, error.message);
+            await message.reply(`❌ Falha ao remover o anúncio. Verifique os logs.`);
         }
     }
 
 
     //================================================================================
-    // SEÇÃO: SINCRONIZAÇÃO COM O PAINEL LARAVEL
+    // SEÇÃO: SINCRONIZAÇÃO COM ARQUIVO LOCAL
     //================================================================================
 
-    static async syncWithPanel() {
+    static async syncWithAdsFile() {
         try {
-            console.log('📡 [AdManager] Sincronizando com o painel Laravel...');
-            const response = await axios.get(`${config.laravelApi.baseUrl}/messages/pending`, {
-                headers: { 'Authorization': `Bearer ${config.laravelApi.token}`, 'Accept': 'application/json' }
+            console.log('📡 [AdManager] Sincronizando com arquivo ads.json...');
+            
+            // Carregar anúncios do arquivo local
+            const adsData = await this.loadAdsFromFile();
+            const localMessages = [];
+
+            // Converter estrutura do arquivo para array
+            Object.keys(adsData.anuncios).forEach(groupId => {
+                Object.keys(adsData.anuncios[groupId]).forEach(adId => {
+                    const ad = adsData.anuncios[groupId][adId];
+                    if (ad.active) {
+                        localMessages.push(ad);
+                    }
+                });
             });
 
-            // 🚨 CORREÇÃO DEFINITIVA - FUNCIONA COM QUALQUER FORMATO DE API 🚨
-            console.log('🔍 [AdManager] Resposta completa da API:', JSON.stringify(response.data, null, 2));
-            
-            let panelMessages = [];
-            
-            // Tenta todos os formatos possíveis
-            if (response.data) {
-                if (Array.isArray(response.data)) {
-                    // Formato: response.data = [...]
-                    panelMessages = response.data;
-                    console.log('✅ [AdManager] Usando formato: response.data (array direto)');
-                } else if (Array.isArray(response.data.data)) {
-                    // Formato: response.data.data = [...]
-                    panelMessages = response.data.data;
-                    console.log('✅ [AdManager] Usando formato: response.data.data');
-                } else if (Array.isArray(response.data.messages)) {
-                    // Formato: response.data.messages = [...]
-                    panelMessages = response.data.messages;
-                    console.log('✅ [AdManager] Usando formato: response.data.messages');
-                } else {
-                    // Nenhum formato reconhecido - usar array vazio
-                    panelMessages = [];
-                    console.log('⚠️ [AdManager] Nenhum formato de array encontrado, usando array vazio');
-                }
-            } else {
-                panelMessages = [];
-                console.log('⚠️ [AdManager] response.data não existe, usando array vazio');
-            }
+            console.log(`[AdManager] ${localMessages.length} anúncios ativos encontrados no arquivo.`);
 
-            // GARANTIA ABSOLUTA: Se não for array, força ser array vazio
-            if (!Array.isArray(panelMessages)) {
-                console.error('🚨 [AdManager] FORÇANDO array vazio - panelMessages não era array:', typeof panelMessages);
-                panelMessages = [];
-            }
+            const localMessageIds = new Set(localMessages.map(m => `local_${m.id}`));
 
-            console.log(`[AdManager] ${panelMessages.length} anúncios encontrados no painel.`);
-
-            const panelMessageIds = new Set(panelMessages.map(m => `panel_${m.id}`));
-
-            // 1. Remove timers de anúncios que não existem mais no painel
+            // 1. Remove timers de anúncios que não existem mais no arquivo
             this.activeTimers.forEach((timerData, uniqueId) => {
-                if (timerData.source === 'panel' && !panelMessageIds.has(uniqueId)) {
-                    console.log(`[AdManager] Anúncio do painel (ID: ${timerData.id}) removido. Parando timer.`);
+                if (timerData.source === 'local' && !localMessageIds.has(uniqueId)) {
+                    console.log(`[AdManager] Anúncio local (ID: ${timerData.id}) removido. Parando timer.`);
                     clearInterval(timerData.timerId);
                     this.activeTimers.delete(uniqueId);
                 }
             });
 
-            // 2. Adiciona ou atualiza anúncios vindos do painel
-            for (const ad of panelMessages) {
-                this.scheduleAd(ad, 'panel');
+            // 2. Adiciona ou atualiza anúncios vindos do arquivo
+            for (const ad of localMessages) {
+                this.scheduleAd(ad, 'local');
             }
             
             console.log(`✅ [AdManager] Sincronização concluída. Total de timers ativos: ${this.activeTimers.size}`);
 
         } catch (error) {
-            // Adiciona um log mais detalhado do erro para facilitar futuras depurações
-            console.error('❌ [AdManager] Erro ao buscar mensagens do painel:', error.response?.data || error.message);
+            console.error('❌ [AdManager] Erro ao sincronizar com arquivo ads.json:', error.message);
         }
     }
 
@@ -311,26 +297,66 @@ class AdManager {
         try {
             console.log(`🚀 [AdManager] Enviando anúncio ID ${adData.id} para o grupo ${adData.group_id}...`);
             
-            // O Sender.js deve ser capaz de lidar com uma URL de mídia ou apenas com o conteúdo.
+            // Enviar mensagem usando o Sender
             const success = await Sender.sendMessage(
-                this.client, // O Sender agora precisa do client para enviar a mensagem
+                this.client,
                 adData.group_id,
                 adData.content,
-                adData.full_media_url // URL da mídia vinda do painel
+                adData.full_media_url || null // URL da mídia se existir
             );
 
             if (success) {
-                try {
-                    await axios.post(`${config.laravelApi.baseUrl}/messages/${adData.id}/sent`, {}, {
-                        headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
-                    });
-                    console.log(`✅ [AdManager] Anúncio ID ${adData.id} marcado como enviado no painel.`);
-                } catch (markError) {
-                    console.error(`⚠️ [AdManager] Falha ao marcar anúncio ID ${adData.id} como enviado:`, markError.response?.data || markError.message);
-                }
+                console.log(`✅ [AdManager] Anúncio ID ${adData.id} enviado com sucesso!`);
+            } else {
+                console.error(`❌ [AdManager] Falha ao enviar anúncio ID ${adData.id}`);
             }
         } catch (error) {
             console.error(`❌ [AdManager] Erro ao enviar anúncio ID ${adData.id}:`, error);
+        }
+    }
+
+    //================================================================================
+    // SEÇÃO: FUNÇÕES DE ARQUIVO
+    //================================================================================
+
+    /**
+     * Garante que o arquivo ads.json existe
+     */
+    static async ensureAdsFileExists() {
+        try {
+            if (!await fs.pathExists(config.adsFilePath)) {
+                const initialData = { anuncios: {} };
+                await fs.writeJson(config.adsFilePath, initialData, { spaces: 2 });
+                console.log(`[AdManager] Arquivo ads.json criado em: ${config.adsFilePath}`);
+            }
+        } catch (error) {
+            console.error('[AdManager] Erro ao criar arquivo ads.json:', error.message);
+        }
+    }
+
+    /**
+     * Carrega anúncios do arquivo JSON
+     */
+    static async loadAdsFromFile() {
+        try {
+            await this.ensureAdsFileExists();
+            const data = await fs.readJson(config.adsFilePath);
+            return data;
+        } catch (error) {
+            console.error('[AdManager] Erro ao carregar ads.json:', error.message);
+            return { anuncios: {} };
+        }
+    }
+
+    /**
+     * Salva anúncios no arquivo JSON
+     */
+    static async saveAdsToFile(data) {
+        try {
+            await fs.writeJson(config.adsFilePath, data, { spaces: 2 });
+        } catch (error) {
+            console.error('[AdManager] Erro ao salvar ads.json:', error.message);
+            throw error;
         }
     }
 
