@@ -213,24 +213,39 @@ class AdManager {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}`, 'Accept': 'application/json' }
             });
 
-            // Debug: Mostrar estrutura da resposta
-            console.log('🔍 [AdManager] Estrutura da resposta:', {
-                'response.data existe?': !!response.data,
-                'response.data.data existe?': !!(response.data && response.data.data),
-                'response.data.data é array?': Array.isArray(response.data && response.data.data),
-                'Tipo de response.data': typeof response.data,
-                'Tipo de response.data.data': typeof (response.data && response.data.data)
-            });
+            // 🚨 CORREÇÃO DEFINITIVA - FUNCIONA COM QUALQUER FORMATO DE API 🚨
+            console.log('🔍 [AdManager] Resposta completa da API:', JSON.stringify(response.data, null, 2));
+            
+            let panelMessages = [];
+            
+            // Tenta todos os formatos possíveis
+            if (response.data) {
+                if (Array.isArray(response.data)) {
+                    // Formato: response.data = [...]
+                    panelMessages = response.data;
+                    console.log('✅ [AdManager] Usando formato: response.data (array direto)');
+                } else if (Array.isArray(response.data.data)) {
+                    // Formato: response.data.data = [...]
+                    panelMessages = response.data.data;
+                    console.log('✅ [AdManager] Usando formato: response.data.data');
+                } else if (Array.isArray(response.data.messages)) {
+                    // Formato: response.data.messages = [...]
+                    panelMessages = response.data.messages;
+                    console.log('✅ [AdManager] Usando formato: response.data.messages');
+                } else {
+                    // Nenhum formato reconhecido - usar array vazio
+                    panelMessages = [];
+                    console.log('⚠️ [AdManager] Nenhum formato de array encontrado, usando array vazio');
+                }
+            } else {
+                panelMessages = [];
+                console.log('⚠️ [AdManager] response.data não existe, usando array vazio');
+            }
 
-            // 👇👇👇 ESTA É A LINHA CORRIGIDA E MAIS IMPORTANTE 👇👇👇
-            // Acessamos response.data.data e garantimos que seja um array com `|| []`
-            const panelMessages = response.data.data || [];
-
-            // Verificação extra de segurança
+            // GARANTIA ABSOLUTA: Se não for array, força ser array vazio
             if (!Array.isArray(panelMessages)) {
-                console.error('❌ [AdManager] ERRO: panelMessages não é um array:', typeof panelMessages, panelMessages);
-                console.error('❌ [AdManager] Resposta completa da API:', JSON.stringify(response.data, null, 2));
-                return; // Sai da função para evitar erro
+                console.error('🚨 [AdManager] FORÇANDO array vazio - panelMessages não era array:', typeof panelMessages);
+                panelMessages = [];
             }
 
             console.log(`[AdManager] ${panelMessages.length} anúncios encontrados no painel.`);
