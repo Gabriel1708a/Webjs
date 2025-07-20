@@ -29,6 +29,21 @@ class AdManager {
         console.log('📢 [AdManager] Iniciando serviço unificado de anúncios...');
         this.client = client; // Armazena a instância do cliente para uso posterior
 
+        // Verificar configuração da API
+        console.log('🔧 [AdManager] Configuração da API:', {
+            baseUrl: config.laravelApi.baseUrl,
+            token: config.laravelApi.token ? '***TOKEN_CONFIGURADO***' : '❌ TOKEN_NÃO_CONFIGURADO',
+            syncInterval: config.syncIntervalSeconds + 's'
+        });
+
+        if (!config.laravelApi.baseUrl || config.laravelApi.baseUrl === 'https://painel.botwpp.tech/api') {
+            console.warn('⚠️ [AdManager] ATENÇÃO: URL da API não configurada ou usando valor padrão.');
+        }
+
+        if (!config.laravelApi.token || config.laravelApi.token === 'teste') {
+            console.warn('⚠️ [AdManager] ATENÇÃO: Token da API não configurado ou usando valor padrão.');
+        }
+
         // Inicia a sincronização periódica com o painel Laravel
         setInterval(() => this.syncWithPanel(), config.syncIntervalSeconds * 1000);
         
@@ -95,7 +110,20 @@ class AdManager {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}`, 'Accept': 'application/json' }
             });
 
-            const newAdFromPanel = response.data.data; // Ajuste conforme a resposta da sua API
+            console.log('📋 [AdManager] Resposta da criação do anúncio:', JSON.stringify(response.data, null, 2));
+
+            // Verificação robusta da resposta de criação
+            let newAdFromPanel = null;
+            if (response.data) {
+                if (response.data.data) {
+                    newAdFromPanel = response.data.data;
+                } else if (response.data.id) {
+                    newAdFromPanel = response.data;
+                } else {
+                    console.warn('⚠️ [AdManager] Estrutura de resposta de criação não reconhecida:', response.data);
+                    newAdFromPanel = { id: 'unknown' };
+                }
+            }
             
             // Força uma sincronização para o anúncio começar a rodar imediatamente.
             await this.syncWithPanel();
@@ -185,7 +213,34 @@ class AdManager {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}`, 'Accept': 'application/json' }
             });
 
-            const panelMessages = response.data.data; // Ajuste conforme a resposta da sua API
+            console.log('📋 [AdManager] Resposta da API recebida:', JSON.stringify(response.data, null, 2));
+
+            // Verificação robusta da estrutura da resposta
+            let panelMessages = [];
+            
+            if (response.data) {
+                if (Array.isArray(response.data)) {
+                    // Se response.data já é um array
+                    panelMessages = response.data;
+                } else if (response.data.data && Array.isArray(response.data.data)) {
+                    // Se os dados estão em response.data.data
+                    panelMessages = response.data.data;
+                } else if (response.data.messages && Array.isArray(response.data.messages)) {
+                    // Se os dados estão em response.data.messages
+                    panelMessages = response.data.messages;
+                } else {
+                    console.warn('⚠️ [AdManager] Estrutura de resposta não reconhecida. Dados recebidos:', response.data);
+                    panelMessages = [];
+                }
+            }
+
+            console.log(`📊 [AdManager] ${panelMessages.length} anúncios encontrados no painel.`);
+
+            if (!Array.isArray(panelMessages)) {
+                console.error('❌ [AdManager] ERRO: panelMessages não é um array:', typeof panelMessages);
+                panelMessages = [];
+            }
+
             const panelMessageIds = new Set(panelMessages.map(m => `panel_${m.id}`));
 
             // 1. Remove timers de anúncios que não existem mais no painel
@@ -255,9 +310,14 @@ class AdManager {
             );
 
             if (success) {
-                await axios.post(`${config.laravelApi.baseUrl}/messages/${adData.id}/sent`, {}, {
-                    headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
-                });
+                try {
+                    await axios.post(`${config.laravelApi.baseUrl}/messages/${adData.id}/sent`, {}, {
+                        headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
+                    });
+                    console.log(`✅ [AdManager] Anúncio ID ${adData.id} marcado como enviado no painel.`);
+                } catch (markError) {
+                    console.error(`⚠️ [AdManager] Falha ao marcar anúncio ID ${adData.id} como enviado:`, markError.response?.data || markError.message);
+                }
             }
         } catch (error) {
             console.error(`❌ [AdManager] Erro ao enviar anúncio ID ${adData.id}:`, error);
