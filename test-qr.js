@@ -52,7 +52,12 @@ client.on('ready', () => {
     console.log(`   Nome: ${client.info.pushname}`);
     console.log('');
     console.log('🎉 Bot pronto para uso!');
-    console.log('💡 Agora você pode executar: npm start');
+    console.log('🔄 Sessão salva para o bot principal!');
+    console.log('');
+    console.log('🚀 PRÓXIMO PASSO:');
+    console.log('   Execute: npm start');
+    console.log('');
+    console.log('💡 O bot principal agora usará esta sessão!');
     console.log('');
     process.exit(0);
 });
