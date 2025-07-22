@@ -1,4 +1,5 @@
 const { DataManager, Utils, RentalSystem } = require('../index');
+const { sincronizarGrupoComPainel } = require('../utils/SyncUtils');
 const moment = require('moment-timezone');
 const fs = require('fs');
 const path = require('path');
@@ -122,6 +123,9 @@ class HorariosHandler {
 
         try {
             await DataManager.saveConfig(groupId, 'horariosAtivos', status);
+            
+            // Sincronizar com o painel
+            await sincronizarGrupoComPainel(groupId);
             
             if (status === 1) {
                 await message.reply('✅ *Horários pagantes ativados!*\n\n🎰 Dicas automáticas habilitadas\n💡 Use !addhorapg para agendar');

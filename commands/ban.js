@@ -1,5 +1,6 @@
 const { DataManager, Utils } = require('../index');
 const axios = require('axios');
+const { sincronizarGrupoComPainel } = require('../utils/SyncUtils');
 
 /**
  * Busca as configurações de um grupo do painel via API.
@@ -60,59 +61,12 @@ function convertApiToLocal(apiConfig) {
 }
 
 /**
- * Sincroniza configurações locais com o painel
- * @param {string} groupId ID do grupo
- * @param {string} configKey Chave da configuração
- * @param {any} value Valor da configuração
+ * Função de sincronização antiga - substituída pela nova função correta
+ * Agora usa sincronizarGrupoComPainel que envia para a rota force-sync
  */
 async function syncToPanel(groupId, configKey, value) {
-    try {
-        const apiUrl = process.env.PANEL_API_URL || 'https://seupainel.com/api';
-        const apiToken = process.env.PANEL_API_TOKEN || 'seu-token-aqui';
-        
-        // Mapear configurações locais para API
-        const apiData = {};
-        
-        if (configKey === 'antiLink') {
-            // Resetar todos os anti-link
-            apiData.ban_extremo = 0;
-            apiData.ban_link_gp = 0;
-            apiData.anti_link_gp = 0;
-            apiData.anti_link = 0;
-            
-            // Ativar o específico
-            switch (value) {
-                case 'banextremo':
-                    apiData.ban_extremo = 1;
-                    break;
-                case 'banlinkgp':
-                    apiData.ban_link_gp = 1;
-                    break;
-                case 'antilinkgp':
-                    apiData.anti_link_gp = 1;
-                    break;
-                case 'antilink':
-                    apiData.anti_link = 1;
-                    break;
-            }
-        } else if (configKey === 'banFoto') {
-            apiData.ban_foto = value ? 1 : 0;
-        } else if (configKey === 'banGringo') {
-            apiData.ban_gringo = value ? 1 : 0;
-        }
-        
-        await axios.post(`${apiUrl}/groups/${groupId}/settings`, apiData, {
-            headers: {
-                'Authorization': `Bearer ${apiToken}`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            }
-        });
-        
-        console.log(`[SYNC] ✅ Configuração ${configKey} sincronizada com o painel`);
-    } catch (error) {
-        console.error(`[SYNC] ❌ Erro ao sincronizar com painel:`, error.message);
-    }
+    // Nova lógica: sincronizar todas as configurações do grupo de uma vez
+    await sincronizarGrupoComPainel(groupId);
 }
 
 class BanHandler {

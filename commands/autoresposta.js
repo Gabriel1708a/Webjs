@@ -1,4 +1,5 @@
 const { DataManager, Utils } = require('../index');
+const { sincronizarGrupoComPainel } = require('../utils/SyncUtils');
 const axios = require('axios');
 const config = require('../config.json');
 
@@ -27,6 +28,9 @@ class AutoRespostaHandler {
 
         try {
             await DataManager.saveConfig(groupId, 'autoResposta', status);
+            
+            // Sincronizar com o painel
+            await sincronizarGrupoComPainel(groupId);
             
             if (status === 1) {
                 await message.reply('✅ *Auto-resposta ativada!*\n\n🤖 O bot agora responderá a:\n• Bom dia/Boa tarde/Boa noite\n• Quando chamarem o nome do bot\n\n💡 Respostas geradas por IA');
