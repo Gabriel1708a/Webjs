@@ -48,7 +48,28 @@ class AutoMessageHandler {
                 }
             });
 
-            const messages = response.data;
+            // [CORREÇÃO] Verificar o formato da resposta do Laravel
+            let messages = response.data;
+            
+            // Se a resposta tem um wrapper 'data', extrair o array
+            if (messages && typeof messages === 'object' && !Array.isArray(messages)) {
+                if (messages.data && Array.isArray(messages.data)) {
+                    messages = messages.data;
+                } else if (messages.messages && Array.isArray(messages.messages)) {
+                    messages = messages.messages;
+                } else {
+                    console.warn('⚠️ Formato de resposta inesperado do painel:', messages);
+                    console.warn('⚠️ Esperado: array ou objeto com propriedade data/messages');
+                    return;
+                }
+            }
+
+            // Verificar se é um array válido
+            if (!Array.isArray(messages)) {
+                console.error('❌ Resposta do painel não é um array válido:', typeof messages, messages);
+                return;
+            }
+
             console.log(`✅ ${messages.length} mensagens encontradas. Sincronizando...`);
             this.syncMessages(messages);
 
@@ -62,6 +83,12 @@ class AutoMessageHandler {
      * @param {Array} panelMessages - Array de mensagens da API.
      */
     static syncMessages(panelMessages) {
+        // [CORREÇÃO] Verificação adicional de segurança
+        if (!Array.isArray(panelMessages)) {
+            console.error('❌ syncMessages: panelMessages não é um array válido:', typeof panelMessages, panelMessages);
+            return;
+        }
+
         console.log('[DEBUG] Iniciando a sincronização. Mensagens ativas no momento:', this.activeMessages.size);
         const panelMessageIds = new Set(panelMessages.map(m => m.id));
 
