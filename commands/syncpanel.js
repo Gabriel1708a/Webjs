@@ -33,8 +33,18 @@ class SyncPanelHandler {
             // URL da nova rota no painel
             const syncUrl = `${apiUrl}/groups/${groupId}/force-sync`;
 
+            // Obter o panel_user_id das configurações locais
+            const panelUserId = localConfig.panel_user_id;
+            if (!panelUserId) {
+                await message.reply('⚠️ *Erro:* ID do usuário do painel não encontrado.\n\n💡 *Dica:* Este grupo precisa ter sido adicionado através do painel web primeiro.');
+                return;
+            }
+
             // Preparar dados para envio ao painel
             const syncData = {
+                // ID do usuário do painel (obrigatório)
+                panel_user_id: panelUserId,
+                
                 // Configurações de anti-link
                 anti_link: localConfig.antiLink === 'antilink' ? 1 : 0,
                 anti_link_gp: localConfig.antiLink === 'antilinkgp' ? 1 : 0,
@@ -71,6 +81,8 @@ class SyncPanelHandler {
 
             if (response.status === 200 || response.status === 201) {
                 let successMessage = '✅ *Sucesso!* Suas configurações atuais do bot foram enviadas e salvas no painel.\n\n';
+                
+                successMessage += `👤 *Usuário do painel:* ${panelUserId}\n\n`;
                 
                 // Mostrar resumo das configurações sincronizadas
                 successMessage += '📋 *Configurações sincronizadas:*\n';

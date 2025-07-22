@@ -76,6 +76,15 @@ class PanelHandler {
             console.log('[PanelHandler] Enviando confirmação para o painel Laravel com os dados:', groupData);
             await this.sendConfirmationToPanel(groupData);
 
+            // Salvar o user_id nas configurações locais do grupo para uso futuro
+            try {
+                const { DataManager } = require('../index');
+                await DataManager.saveConfig(groupId, 'panel_user_id', user_id);
+                console.log(`[PanelHandler] ✅ User ID ${user_id} salvo nas configurações do grupo ${groupId}`);
+            } catch (saveError) {
+                console.warn(`[PanelHandler] ⚠️ Erro ao salvar user_id nas configurações: ${saveError.message}`);
+            }
+
             console.log(`[PanelHandler] ✅ Processamento concluído em ${Date.now() - startTime}ms`);
             
             return res.status(200).json({ 
