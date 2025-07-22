@@ -62,6 +62,9 @@ class MenuHandler {
 👑 !soadm 1/0 – Modo só admin (comandos interativos)
 🔓 Quando ativado, apenas admins usam comandos interativos
 
+🔄 *SINCRONIZAÇÃO:*
+📊 !syncstatus – Status painel ↔ local
+
 ━━━━━━━━━━━━━━━━━━━━━
 🤖 *Bot Admin v1.0*
 🔒 Sistema de segurança aprimorado

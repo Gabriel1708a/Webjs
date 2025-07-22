@@ -1,3 +1,6 @@
+// Carregar variáveis de ambiente
+require('dotenv').config();
+
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs-extra');
 const moment = require('moment-timezone');
@@ -33,7 +36,7 @@ async function notificarPainelLaravel() {
 }
 
 // Importar módulos de comandos (será feito após definir as classes)
-let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupControlHandler, horariosHandler, autoRespostaHandler;
+let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupControlHandler, horariosHandler, autoRespostaHandler, syncStatusHandler;
 
 // Importar handler de mensagens automáticas do Laravel
 const AutoMessageHandler = require('./handlers/AutoMessageHandler');
@@ -382,6 +385,7 @@ client.on('ready', async () => {
     groupControlHandler = require('./commands/groupControl');
     horariosHandler = require('./commands/horarios');
     autoRespostaHandler = require('./commands/autoresposta');
+    syncStatusHandler = require('./commands/sync-status');
     
     Logger.info('Módulos de comandos carregados');
     
@@ -487,7 +491,7 @@ client.on('message_create', async (message) => {
     const adminOnlyCommands = [
         'all', 'allg', 'allg2', 'ban', 'banextremo', 'banlinkgp', 'antilinkgp', 'antilink', 
         'banfoto', 'bangringo', 'addads', 'rmads', 'listads', 'bv', 'legendabv', 
-        'abrirgrupo', 'fechargrupo', 'abrirgp', 'fechargp', 'afgp', 'soadm', 
+        'abrirgrupo', 'fechargrupo', 'abrirgp', 'fechargp', 'afgp', 'soadm', 'syncstatus',
         'horapg', 'addhorapg', 'imagem-horarios', 'sorteio', 'updatebot', 'atualizar',
         'apagar', 'autoresposta'
     ];
@@ -543,6 +547,10 @@ client.on('message_create', async (message) => {
                 } else {
                     await message.reply('❌ Use: !soadm 1 (ativar) ou !soadm 0 (desativar)');
                 }
+                break;
+
+            case 'syncstatus':
+                await syncStatusHandler.handle(client, message, command, args);
                 break;
 
             case 'sorte':
