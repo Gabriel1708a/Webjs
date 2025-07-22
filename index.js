@@ -4,6 +4,7 @@ const moment = require('moment-timezone');
 const path = require('path');
 const chalk = require('chalk');
 const axios = require('axios');
+const qrcode = require('qrcode-terminal');
 
 // Importar configurações
 const config = require('./config.json');
@@ -337,7 +338,30 @@ class Utils {
 
 // Eventos do cliente
 client.on('qr', (qr) => {
-    console.log('QR Code recebido (backup):', qr);
+    console.log('');
+    Logger.logBox('QR CODE DISPONÍVEL', [
+        '📱 QR Code gerado com sucesso!',
+        '',
+        '🔍 Veja o QR Code abaixo:'
+    ], 'cyan');
+    
+    console.log('');
+    qrcode.generate(qr, { small: true });
+    console.log('');
+    
+    Logger.logBox('COMO CONECTAR', [
+        '📱 PELO QR CODE:',
+        '1. Abra WhatsApp no celular',
+        '2. Configurações > Aparelhos conectados',
+        '3. "Conectar um aparelho"',
+        '4. Aponte a câmera para o QR Code acima',
+        '',
+        '📞 PELO CÓDIGO DE PAREAMENTO:',
+        '(Veja o código que aparecerá abaixo)',
+        '',
+        '⏰ Ambos expiram em alguns minutos!'
+    ], 'yellow');
+    console.log('');
 });
 
 client.on('ready', async () => {
@@ -960,6 +984,7 @@ async function initialize() {
     try {
         // Listener único para QR/Pareamento
         client.on('qr', async (qr) => {
+            console.log('');
             Logger.info('Gerando código de pareamento...');
             
             try {
@@ -968,7 +993,7 @@ async function initialize() {
                 Logger.logBox('CÓDIGO DE PAREAMENTO', [
                     `🔑 Código: ${pairingCode}`,
                     '',
-                    '📱 COMO CONECTAR:',
+                    '📞 ALTERNATIVA AO QR CODE:',
                     '1. WhatsApp > Configurações',
                     '2. Aparelhos conectados',
                     '3. "Conectar um aparelho"',
