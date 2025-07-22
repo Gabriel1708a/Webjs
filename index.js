@@ -47,6 +47,9 @@ const Sender = require('./Sender');
 // Importar handler do painel para entrada em grupos
 const PanelHandler = require('./handlers/PanelHandler');
 
+// Importar handler de sincronização automática
+const SyncHandler = require('./handlers/SyncHandler');
+
 // Importar o sistema unificado de anúncios
 // const AdManager = require('./commands/AdManager'); // Temporariamente desabilitado
 
@@ -412,6 +415,15 @@ client.on('ready', async () => {
     // Inicializar handler do painel para entrada em grupos
     PanelHandler.initialize();
     Logger.success('Handler do painel inicializado');
+    
+    // --- [NOVA LÓGICA DE SINCRONIZAÇÃO] ---
+    // Cria uma instância do nosso handler, passando 30000 milissegundos (30 segundos)
+    const syncHandler = new SyncHandler(30000); 
+        
+    // Inicia o processo de sincronização automática
+    syncHandler.start();
+    Logger.success('Sincronização automática inicializada');
+    // --- [FIM DA NOVA LÓGICA] ---
     
     // Inicializar sistema unificado de anúncios
     // await AdManager.initialize(client); // Temporariamente desabilitado
