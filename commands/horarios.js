@@ -125,7 +125,8 @@ class HorariosHandler {
             await DataManager.saveConfig(groupId, 'horariosAtivos', status);
             
             // Sincronizar com o painel
-            await sincronizarGrupoComPainel(groupId);
+            // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
+            await sincronizarGrupoComPainel(groupId, DataManager);
             
             if (status === 1) {
                 await message.reply('✅ *Horários pagantes ativados!*\n\n🎰 Dicas automáticas habilitadas\n💡 Use !addhorapg para agendar');

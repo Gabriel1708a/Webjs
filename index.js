@@ -556,11 +556,13 @@ client.on('message_create', async (message) => {
                 const statusSoadm = parseInt(args);
                 if (statusSoadm === 1) {
                     await DataManager.saveConfig(groupId, 'soadm', '1');
-                    await sincronizarGrupoComPainel(groupId);
+                    // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
+                    await sincronizarGrupoComPainel(groupId, DataManager);
                     await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos\n📝 Comandos afetados: !horarios, !sorte, !conselhos, !menu');
                 } else if (statusSoadm === 0) {
                     await DataManager.saveConfig(groupId, 'soadm', '0');
-                    await sincronizarGrupoComPainel(groupId);
+                    // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
+                    await sincronizarGrupoComPainel(groupId, DataManager);
                     await message.reply('🔓 *Modo SOADM desativado!*\n\n👥 Todos os membros podem usar comandos interativos');
                 } else {
                     await message.reply('❌ Use: !soadm 1 (ativar) ou !soadm 0 (desativar)');

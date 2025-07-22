@@ -2,22 +2,23 @@
 
 const axios = require('axios');
 
-// [CORREÇÃO] Importa o DataManager diretamente do seu arquivo de origem.
-// O caminho pode variar, ajuste se o seu DataManager.js estiver em outra pasta.
-const { DataManager } = require('../index'); 
-
 /**
  * Sincroniza TODAS as configurações de um grupo específico com o painel.
- * Esta função deve ser chamada após qualquer comando que altere uma configuração.
  * @param {string} groupId O ID do grupo a ser sincronizado.
+ * @param {object} dataManager O objeto DataManager já instanciado.
  */
-async function sincronizarGrupoComPainel(groupId) {
+async function sincronizarGrupoComPainel(groupId, dataManager) { // <-- Recebe o dataManager
     try {
         console.log(`[SYNC-COMMAND] Iniciando sincronização para o grupo ${groupId} após comando.`);
-            
-        // 1. Pega todas as configurações locais atuais do grupo
-        // Esta linha agora funcionará, pois o DataManager foi importado corretamente.
-        const configsDoGrupo = await DataManager.loadConfig(groupId);
+        
+        // [CORREÇÃO] Verifica se o dataManager foi passado corretamente
+        if (!dataManager) {
+            console.error(`[SYNC-COMMAND] Falha crítica: O objeto DataManager não foi fornecido.`);
+            return;
+        }
+
+        // 1. Pega as configurações usando o objeto dataManager recebido
+        const configsDoGrupo = await dataManager.loadConfig(groupId);
 
         // 2. Garante que o panel_user_id existe, pois é obrigatório pela API
         if (!configsDoGrupo || !configsDoGrupo.panel_user_id) {
@@ -62,7 +63,7 @@ async function sincronizarGrupoComPainel(groupId) {
 
     } catch (error) {
         const statusCode = error.response ? error.response.status : 'N/A';
-        console.error(`[SYNC-COMMAND] ❌ Erro ao sincronizar grupo ${groupId} com o painel. Status: ${statusCode}. Erro: ${error.message}`);
+        console.error(`[SYNC-COMMAND] ❌ Erro ao sincronizar grupo ${groupId}. Status: ${statusCode}. Erro: ${error.message}`);
     }
 }
 

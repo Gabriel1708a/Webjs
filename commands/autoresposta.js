@@ -30,7 +30,8 @@ class AutoRespostaHandler {
             await DataManager.saveConfig(groupId, 'autoResposta', status);
             
             // Sincronizar com o painel
-            await sincronizarGrupoComPainel(groupId);
+            // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
+            await sincronizarGrupoComPainel(groupId, DataManager);
             
             if (status === 1) {
                 await message.reply('✅ *Auto-resposta ativada!*\n\n🤖 O bot agora responderá a:\n• Bom dia/Boa tarde/Boa noite\n• Quando chamarem o nome do bot\n\n💡 Respostas geradas por IA');

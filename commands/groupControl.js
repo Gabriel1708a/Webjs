@@ -75,7 +75,8 @@ class GroupControlHandler {
             await DataManager.saveConfig(groupId, 'horarioAbertura', horario);
             
             // Sincronizar com o painel
-            await sincronizarGrupoComPainel(groupId);
+            // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
+            await sincronizarGrupoComPainel(groupId, DataManager);
             
             // Agendar tarefa
             this.scheduleTask(client, groupId, horario, 'open');
@@ -99,7 +100,8 @@ class GroupControlHandler {
             await DataManager.saveConfig(groupId, 'horarioFechamento', horario);
             
             // Sincronizar com o painel
-            await sincronizarGrupoComPainel(groupId);
+            // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
+            await sincronizarGrupoComPainel(groupId, DataManager);
             
             // Agendar tarefa
             this.scheduleTask(client, groupId, horario, 'close');

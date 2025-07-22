@@ -66,7 +66,8 @@ function convertApiToLocal(apiConfig) {
  */
 async function syncToPanel(groupId, configKey, value) {
     // Nova lógica: sincronizar todas as configurações do grupo de uma vez
-    await sincronizarGrupoComPainel(groupId);
+    // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
+    await sincronizarGrupoComPainel(groupId, DataManager);
 }
 
 class BanHandler {
