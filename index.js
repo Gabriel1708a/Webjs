@@ -411,9 +411,9 @@ client.on('ready', async () => {
     Sender.initialize(client);
     Logger.success('Módulo de envio centralizado inicializado');
     
-    // Inicializar serviço de mensagens automáticas do Laravel
-    await AutoMessageHandler.initialize();
-    Logger.success('Serviço de mensagens automáticas inicializado');
+    // Inicializar serviço de mensagens automáticas híbrido (Laravel + Local)
+    await AutoMessageHandler.initialize(DataManager);
+    Logger.success('Serviço de mensagens automáticas híbrido inicializado');
     
     // Inicializar handler do painel para entrada em grupos
     PanelHandler.initialize();
