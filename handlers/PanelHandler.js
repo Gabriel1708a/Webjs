@@ -76,15 +76,6 @@ class PanelHandler {
             console.log('[PanelHandler] Enviando confirmação para o painel Laravel com os dados:', groupData);
             await this.sendConfirmationToPanel(groupData);
 
-            // Salvar o user_id nas configurações locais do grupo para uso futuro
-            try {
-                const { DataManager } = require('../index');
-                await DataManager.saveConfig(groupId, 'panel_user_id', user_id);
-                console.log(`[PanelHandler] ✅ User ID ${user_id} salvo nas configurações do grupo ${groupId}`);
-            } catch (saveError) {
-                console.warn(`[PanelHandler] ⚠️ Erro ao salvar user_id nas configurações: ${saveError.message}`);
-            }
-
             console.log(`[PanelHandler] ✅ Processamento concluído em ${Date.now() - startTime}ms`);
             
             return res.status(200).json({ 
@@ -192,14 +183,37 @@ class PanelHandler {
         
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                await axios.post('https://painel.botwpp.tech/api/groups/confirm', groupData, {
+                const response = await axios.post('https://painel.botwpp.tech/api/groups/confirm', groupData, {
                     timeout: 10000,
                     headers: {
                         'Content-Type': 'application/json',
                         'User-Agent': 'WhatsApp-Bot/1.0'
                     }
                 });
+
                 console.log(`[PanelHandler] ✅ Confirmação enviada ao painel com sucesso`);
+
+                // [NOVA LÓGICA] - Processar resposta e salvar panel_user_id
+                if (response.data && response.data.success && response.data.data && response.data.data.panel_user_id) {
+                    
+                    const panelUserId = response.data.data.panel_user_id;
+                    
+                    try {
+                        // Salva o ID do usuário recebido do painel no arquivo de configuração local do bot
+                        const { DataManager } = require('../index');
+                        await DataManager.saveConfig(groupData.group_id, 'panel_user_id', panelUserId);
+                        
+                        console.log(`[PanelHandler] ✅ Grupo confirmado e panel_user_id (${panelUserId}) salvo localmente!`);
+                    } catch (saveError) {
+                        console.error(`[PanelHandler] ❌ Erro ao salvar panel_user_id: ${saveError.message}`);
+                    }
+                
+                } else {
+                    // Se a resposta não veio como esperado, registre um erro
+                    console.error('[PanelHandler] ⚠️ Confirmação enviada, mas a resposta da API não continha o panel_user_id.');
+                    console.log('[PanelHandler] Resposta recebida:', JSON.stringify(response.data, null, 2));
+                }
+
                 return;
             } catch (error) {
                 console.warn(`[PanelHandler] Tentativa ${attempt} de envio ao painel falhou:`, error.message);
