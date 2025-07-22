@@ -323,9 +323,7 @@ class AutoMessageHandler {
         
         console.log(`⏰ Agendando anúncio local ID ${adData.id} para grupo ${groupId} (${adData.intervalo} min)`);
 
-        // Enviar primeira vez imediatamente
-        this.sendLocalAd(groupId, adData);
-
+        // [CORREÇÃO] NÃO enviar imediatamente - apenas agendar
         // Agendar envios recorrentes
         const timerId = setInterval(() => {
             this.sendLocalAd(groupId, adData);
