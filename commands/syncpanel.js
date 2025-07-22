@@ -26,6 +26,10 @@ class SyncPanelHandler {
                 return;
             }
 
+            // Carregar anúncios do grupo
+            const adsData = await DataManager.loadData('ads.json');
+            const groupAds = adsData.anuncios && adsData.anuncios[groupId] ? adsData.anuncios[groupId] : {};
+
             // URLs e token do painel
             const apiUrl = process.env.PANEL_API_URL || 'https://painel.botwpp.tech/api';
             const apiToken = process.env.PANEL_API_TOKEN || 'teste';
@@ -66,7 +70,20 @@ class SyncPanelHandler {
                 
                 // Dados adicionais que podem ser úteis
                 ultima_sincronizacao: new Date().toISOString(),
-                configuracoes_completas: localConfig
+                configuracoes_completas: localConfig,
+                
+                // [NOVO] Anúncios do grupo
+                anuncios: Object.values(groupAds).map(ad => ({
+                    id: ad.id,
+                    mensagem: ad.mensagem,
+                    intervalo: ad.intervalo,
+                    ativo: ad.ativo,
+                    tipo: ad.tipo,
+                    criado: ad.criado,
+                    // Não enviamos dados de mídia por serem muito grandes
+                    tem_media: ad.media ? true : false,
+                    tipo_media: ad.media ? ad.media.mimetype : null
+                }))
             };
 
             // Faz a requisição POST, enviando as configurações locais no corpo
@@ -94,7 +111,13 @@ class SyncPanelHandler {
                 if (localConfig.soadm === '1') successMessage += '• Modo SOADM: Ativado\n';
                 if (localConfig.horariosAtivos) successMessage += '• Horários: Ativado\n';
                 
-                successMessage += '\n💡 *Agora suas configurações estão sincronizadas entre o bot e o painel web!*';
+                // [NOVO] Mostrar informações dos anúncios
+                const activeAds = Object.values(groupAds).filter(ad => ad.ativo);
+                if (activeAds.length > 0) {
+                    successMessage += `• Anúncios: ${activeAds.length} ativo(s)\n`;
+                }
+                
+                successMessage += '\n💡 *Agora suas configurações e anúncios estão sincronizados entre o bot e o painel web!*';
                 
                 await message.reply(successMessage);
             } else {

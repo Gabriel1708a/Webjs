@@ -26,12 +26,16 @@ async function sincronizarGrupoComPainel(groupId, dataManager) { // <-- Recebe o
             return;
         }
 
-        // 3. Define a URL correta para a sincronização forçada
+        // 3. Carregar anúncios do grupo
+        const adsData = await dataManager.loadData('ads.json');
+        const groupAds = adsData.anuncios && adsData.anuncios[groupId] ? adsData.anuncios[groupId] : {};
+
+        // 4. Define a URL correta para a sincronização forçada
         const apiUrl = process.env.PANEL_API_URL || 'https://painel.botwpp.tech/api';
         const apiToken = process.env.PANEL_API_TOKEN || 'teste';
         const url = `${apiUrl}/groups/${groupId}/force-sync`;
 
-        // 4. Preparar dados para envio ao painel (mesmo formato do comando syncpanel)
+        // 5. Preparar dados para envio ao painel (mesmo formato do comando syncpanel)
         const syncData = {
             panel_user_id: configsDoGrupo.panel_user_id,
             anti_link: configsDoGrupo.antiLink === 'antilink' ? 1 : 0,
@@ -47,9 +51,20 @@ async function sincronizarGrupoComPainel(groupId, dataManager) { // <-- Recebe o
             intervalo_horarios: configsDoGrupo.intervaloHorarios || 60,
             horario_abertura: configsDoGrupo.horarioAbertura || null,
             horario_fechamento: configsDoGrupo.horarioFechamento || null,
+            // [NOVO] Anúncios do grupo
+            anuncios: Object.values(groupAds).map(ad => ({
+                id: ad.id,
+                mensagem: ad.mensagem,
+                intervalo: ad.intervalo,
+                ativo: ad.ativo,
+                tipo: ad.tipo,
+                criado: ad.criado,
+                tem_media: ad.media ? true : false,
+                tipo_media: ad.media ? ad.media.mimetype : null
+            }))
         };
 
-        // 5. Envia os dados usando POST para a rota correta
+        // 6. Envia os dados usando POST para a rota correta
         await axios.post(url, syncData, {
             headers: { 
                 'Authorization': `Bearer ${apiToken}`,
