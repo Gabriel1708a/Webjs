@@ -1,4 +1,6 @@
 const { DataManager, Utils } = require('../index');
+const axios = require('axios');
+const config = require('../config.json');
 
 class AdsHandler {
     static intervals = new Map(); // Armazenar intervalos ativos
@@ -86,11 +88,14 @@ class AdsHandler {
             ads.anuncios[groupId][adId] = adData;
             await DataManager.saveData('ads.json', ads);
 
+            // [NOVO] Sincronizar automaticamente com o banco de dados
+            await this.syncAdWithDatabase(groupId, adData, 'create');
+
             // Iniciar intervalo
             this.startAdInterval(client, groupId, adId, adData);
 
             const tipoMidia = mediaData ? `📷 ${mediaData.mimetype.includes('video') ? 'Vídeo' : 'Imagem'}` : '📝 Texto';
-            await message.reply(`✅ *Anúncio criado!*\n\n📢 ID: ${adId}\n⏰ Intervalo: ${intervalo} minutos\n${tipoMidia}\n📝 Mensagem: ${mensagem.substring(0, 50)}${mensagem.length > 50 ? '...' : ''}`);
+            await message.reply(`✅ *Anúncio criado!*\n\n📢 ID: ${adId}\n⏰ Intervalo: ${intervalo} minutos\n${tipoMidia}\n📝 Mensagem: ${mensagem.substring(0, 50)}${mensagem.length > 50 ? '...' : ''}\n\n🔄 *Sincronizado com o painel automaticamente*`);
 
         } catch (error) {
             console.error('Erro ao criar anúncio:', error);
@@ -147,6 +152,9 @@ class AdsHandler {
                 return;
             }
 
+            // Guardar dados do anúncio antes de remover (para sincronização)
+            const adData = ads.anuncios[groupId][adId];
+
             // Parar intervalo
             const intervalKey = `${groupId}_${adId}`;
             if (this.intervals.has(intervalKey)) {
@@ -158,7 +166,10 @@ class AdsHandler {
             delete ads.anuncios[groupId][adId];
             await DataManager.saveData('ads.json', ads);
 
-            await message.reply(`✅ *Anúncio removido!*\n\n🗑️ ID: ${adId}`);
+            // [NOVO] Sincronizar remoção com o banco de dados
+            await this.syncAdWithDatabase(groupId, adData, 'delete');
+
+            await message.reply(`✅ *Anúncio removido!*\n\n🗑️ ID: ${adId}\n\n🔄 *Removido do painel automaticamente*`);
 
         } catch (error) {
             console.error('Erro ao remover anúncio:', error);
@@ -214,6 +225,77 @@ class AdsHandler {
             console.log('📢 Anúncios automáticos carregados');
         } catch (error) {
             console.error('Erro ao carregar anúncios:', error);
+        }
+    }
+
+    /**
+     * Sincroniza um anúncio específico com o banco de dados do Laravel
+     * @param {string} groupId - ID do grupo
+     * @param {object} adData - Dados do anúncio
+     * @param {string} action - Ação: 'create', 'update', 'delete'
+     */
+    static async syncAdWithDatabase(groupId, adData, action = 'create') {
+        try {
+            // Obter panel_user_id das configurações do grupo
+            const groupConfig = await DataManager.loadConfig(groupId);
+            if (!groupConfig || !groupConfig.panel_user_id) {
+                console.warn(`[ADS-SYNC] panel_user_id não encontrado para grupo ${groupId}. Sincronização ignorada.`);
+                return;
+            }
+
+            const apiUrl = config.laravelApi?.baseUrl || 'https://painel.botwpp.tech/api';
+            const apiToken = config.laravelApi?.token || 'teste';
+
+            let url, method, data;
+
+            switch (action) {
+                case 'create':
+                    url = `${apiUrl}/ads`;
+                    method = 'POST';
+                    data = {
+                        user_id: groupConfig.panel_user_id,
+                        group_id: groupId,
+                        content: adData.mensagem,
+                        interval: adData.intervalo,
+                        unit: 'minutos', // Sempre em minutos para compatibilidade
+                        media_url: adData.media ? 'local_media' : null, // Placeholder para mídia local
+                        local_ad_id: adData.id // ID local para referência
+                    };
+                    break;
+
+                case 'delete':
+                    url = `${apiUrl}/ads/local/${adData.id}`;
+                    method = 'DELETE';
+                    data = {
+                        user_id: groupConfig.panel_user_id,
+                        group_id: groupId
+                    };
+                    break;
+
+                default:
+                    console.warn(`[ADS-SYNC] Ação '${action}' não suportada`);
+                    return;
+            }
+
+            const response = await axios({
+                method,
+                url,
+                data,
+                headers: {
+                    'Authorization': `Bearer ${apiToken}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                timeout: 10000
+            });
+
+            if (response.status >= 200 && response.status < 300) {
+                console.log(`[ADS-SYNC] ✅ Anúncio ID ${adData.id} sincronizado (${action}) com banco de dados`);
+            }
+
+        } catch (error) {
+            const status = error.response?.status || 'N/A';
+            console.error(`[ADS-SYNC] ❌ Erro ao sincronizar anúncio ID ${adData.id} (${action}). Status: ${status}. Erro: ${error.message}`);
         }
     }
 }

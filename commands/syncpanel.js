@@ -72,7 +72,7 @@ class SyncPanelHandler {
                 ultima_sincronizacao: new Date().toISOString(),
                 configuracoes_completas: localConfig,
                 
-                // [NOVO] Anúncios do grupo
+                // [NOVO] Anúncios do grupo - formato simplificado para force-sync
                 anuncios: Object.values(groupAds).map(ad => ({
                     id: ad.id,
                     mensagem: ad.mensagem,
@@ -80,7 +80,6 @@ class SyncPanelHandler {
                     ativo: ad.ativo,
                     tipo: ad.tipo,
                     criado: ad.criado,
-                    // Não enviamos dados de mídia por serem muito grandes
                     tem_media: ad.media ? true : false,
                     tipo_media: ad.media ? ad.media.mimetype : null
                 }))
@@ -95,6 +94,9 @@ class SyncPanelHandler {
                 },
                 timeout: 10000 // 10 segundos de timeout
             });
+
+            // [NOVO] Sincronizar todos os anúncios com o banco de dados
+            await this.syncAllAdsToDatabase(groupId, groupAds, panelUserId, apiUrl, apiToken);
 
             if (response.status === 200 || response.status === 201) {
                 let successMessage = '✅ *Sucesso!* Suas configurações atuais do bot foram enviadas e salvas no painel.\n\n';
@@ -144,6 +146,61 @@ class SyncPanelHandler {
             errorMessage += '\n\n💡 *Dica:* Verifique se o grupo está cadastrado no painel e tente novamente.';
             
             await message.reply(errorMessage);
+        }
+    }
+
+    /**
+     * Sincroniza todos os anúncios locais com o banco de dados
+     * @param {string} groupId - ID do grupo
+     * @param {object} groupAds - Anúncios do grupo
+     * @param {string} panelUserId - ID do usuário do painel
+     * @param {string} apiUrl - URL da API
+     * @param {string} apiToken - Token da API
+     */
+    static async syncAllAdsToDatabase(groupId, groupAds, panelUserId, apiUrl, apiToken) {
+        try {
+            const activeAds = Object.values(groupAds).filter(ad => ad.ativo);
+            
+            if (activeAds.length === 0) {
+                console.log(`[SYNCPANEL] Nenhum anúncio ativo para sincronizar no grupo ${groupId}`);
+                return;
+            }
+
+            console.log(`[SYNCPANEL] Sincronizando ${activeAds.length} anúncios com o banco de dados...`);
+
+            // Enviar todos os anúncios para o banco
+            for (const ad of activeAds) {
+                try {
+                    const adData = {
+                        user_id: panelUserId,
+                        group_id: groupId,
+                        content: ad.mensagem,
+                        interval: ad.intervalo,
+                        unit: 'minutos',
+                        media_url: ad.media ? 'local_media' : null,
+                        local_ad_id: ad.id
+                    };
+
+                    await axios.post(`${apiUrl}/ads`, adData, {
+                        headers: {
+                            'Authorization': `Bearer ${apiToken}`,
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        timeout: 10000
+                    });
+
+                    console.log(`[SYNCPANEL] ✅ Anúncio ID ${ad.id} sincronizado com banco de dados`);
+
+                } catch (adError) {
+                    console.error(`[SYNCPANEL] ❌ Erro ao sincronizar anúncio ID ${ad.id}:`, adError.message);
+                }
+            }
+
+            console.log(`[SYNCPANEL] ✅ Sincronização de anúncios concluída`);
+
+        } catch (error) {
+            console.error(`[SYNCPANEL] ❌ Erro geral na sincronização de anúncios:`, error.message);
         }
     }
 }
