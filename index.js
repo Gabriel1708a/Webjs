@@ -356,10 +356,11 @@ client.on('qr', (qr) => {
         '3. "Conectar um aparelho"',
         '4. Aponte a câmera para o QR Code acima',
         '',
-        '📞 PELO CÓDIGO DE PAREAMENTO:',
-        '(Veja o código que aparecerá abaixo)',
+        '💡 CÓDIGO DE PAREAMENTO:',
+        '   Execute: node test-pairing.js',
+        '   (Método alternativo)',
         '',
-        '⏰ Ambos expiram em alguns minutos!'
+        '⏰ QR Code expira em alguns minutos!'
     ], 'yellow');
     console.log('');
 });
@@ -982,41 +983,22 @@ async function initialize() {
     ], 'cyan');
     
     try {
-        // Listener único para QR/Pareamento
+        // Listener para QR apenas (sem código de pareamento problemático)
         client.on('qr', async (qr) => {
+            // Não gerar código de pareamento - apenas mostrar QR
             console.log('');
-            Logger.info('Gerando código de pareamento...');
-            
-            try {
-                const pairingCode = await client.requestPairingCode(config.numeroBot);
-                
-                Logger.logBox('CÓDIGO DE PAREAMENTO', [
-                    `🔑 Código: ${pairingCode}`,
-                    '',
-                    '📞 ALTERNATIVA AO QR CODE:',
-                    '1. WhatsApp > Configurações',
-                    '2. Aparelhos conectados',
-                    '3. "Conectar um aparelho"',
-                    '4. "Usar código do telefone"',
-                    `5. Digite: ${pairingCode}`,
-                    '',
-                    '⏰ Código expira em alguns minutos!'
-                ], 'yellow');
-                
-            } catch (error) {
-                Logger.error('Erro ao gerar código. Sessão pode estar corrompida.');
-                Logger.warning('Limpando cache...');
-                
-                try {
-                    if (fs.existsSync('./.wwebjs_auth')) fs.removeSync('./.wwebjs_auth');
-                    if (fs.existsSync('./.wwebjs_cache')) fs.removeSync('./.wwebjs_cache');
-                    Logger.success('Cache limpo. Execute novamente: npm start');
-                    process.exit(1);
-                } catch (cleanError) {
-                    Logger.error(`Erro ao limpar: ${cleanError.message}`);
-                    process.exit(1);
-                }
-            }
+            Logger.logBox('CONECTE VIA QR CODE', [
+                '📱 Use apenas o QR Code acima',
+                '',
+                '⚠️  CÓDIGO DE PAREAMENTO DESABILITADO',
+                '   (Gerava códigos inválidos)',
+                '',
+                '💡 ALTERNATIVAS:',
+                '   • Use o QR Code (recomendado)',
+                '   • Execute: node test-pairing.js',
+                '',
+                '⏰ QR Code expira em alguns minutos!'
+            ], 'yellow');
         });
         
         // Inicializar cliente

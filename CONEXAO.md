@@ -10,8 +10,8 @@ npm start
 
 **🎯 O que acontece:**
 1. **QR Code** aparece diretamente no terminal ✅
-2. **Código de Pareamento** é gerado automaticamente ✅
-3. **Você escolhe** qual método usar! 🎉
+2. **Código de Pareamento** desabilitado (gerava códigos inválidos) ⚠️
+3. **Use QR Code** como método principal! 📱
 
 ---
 
@@ -35,18 +35,20 @@ npm start
 6. ✅ Conectado!
 
 ### **📞 MÉTODO 2: Código de Pareamento**
-```
-🔑 Código: AB-CD-EF-12
+```bash
+node test-pairing.js
 ```
 
 **📋 Passos:**
-1. Execute `npm start` 
+1. Execute `node test-pairing.js` 
 2. Veja o código que aparece
 3. WhatsApp → Configurações → Aparelhos conectados
 4. "Conectar um aparelho"
 5. "Usar código do telefone"
 6. Digite o código mostrado
 7. ✅ Conectado!
+
+**⚠️ IMPORTANTE:** `npm start` não gera mais códigos (eram inválidos)
 
 ---
 
@@ -67,6 +69,15 @@ node fix-session.js
 - Remove sessão corrompida
 - Força nova autenticação
 - Use quando tiver problemas
+- **Cooldown de 1 minuto** entre limpezas
+
+### **⏰ Verificar Cooldown**
+```bash
+node check-cooldown.js
+```
+- Verifica tempo restante do cooldown
+- Mostra última limpeza
+- Lista comandos disponíveis
 
 ### **📱 QR Code Dedicado**
 ```bash
