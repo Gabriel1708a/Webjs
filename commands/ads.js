@@ -108,31 +108,56 @@ class AdsHandler {
             const ads = await DataManager.loadData('ads.json');
             const groupAds = ads.anuncios && ads.anuncios[groupId] ? ads.anuncios[groupId] : {};
 
+            console.log(`📊 Debug !listads - Grupo: ${groupId}`);
+            console.log(`📊 Estrutura ads.json:`, JSON.stringify(ads, null, 2));
+            console.log(`📊 Anúncios do grupo:`, JSON.stringify(groupAds, null, 2));
+
             if (Object.keys(groupAds).length === 0) {
-                await message.reply('📭 *Nenhum anúncio ativo neste grupo*');
+                await message.reply('📭 *Nenhum anúncio cadastrado neste grupo*\n\n💡 Use !addads para criar um anúncio');
                 return;
             }
 
-            let listText = '📢 *ANÚNCIOS ATIVOS:*\n\n';
+            let listTextAtivos = '';
+            let listTextInativos = '';
+            let countAtivos = 0;
+            let countInativos = 0;
 
             Object.values(groupAds).forEach(ad => {
+                const tipoIcon = ad.media ? (ad.media.mimetype.includes('video') ? '🎥' : '📷') : '📝';
+                const tipoTexto = ad.media ? (ad.media.mimetype.includes('video') ? 'Vídeo' : 'Imagem') : 'Texto';
+                
+                const adInfo = `🆔 *ID:* ${ad.id}\n` +
+                              `⏰ *Intervalo:* ${ad.intervalo} min\n` +
+                              `${tipoIcon} *Tipo:* ${tipoTexto}\n` +
+                              `📝 *Mensagem:* ${ad.mensagem.substring(0, 80)}${ad.mensagem.length > 80 ? '...' : ''}\n` +
+                              `━━━━━━━━━━━━━━━━━━\n\n`;
+
                 if (ad.ativo) {
-                    const tipoIcon = ad.media ? (ad.media.mimetype.includes('video') ? '🎥' : '📷') : '📝';
-                    const tipoTexto = ad.media ? (ad.media.mimetype.includes('video') ? 'Vídeo' : 'Imagem') : 'Texto';
-                    
-                    listText += `🆔 *ID:* ${ad.id}\n`;
-                    listText += `⏰ *Intervalo:* ${ad.intervalo} min\n`;
-                    listText += `${tipoIcon} *Tipo:* ${tipoTexto}\n`;
-                    listText += `📝 *Mensagem:* ${ad.mensagem.substring(0, 100)}${ad.mensagem.length > 100 ? '...' : ''}\n`;
-                    listText += `━━━━━━━━━━━━━━━━━━\n\n`;
+                    listTextAtivos += adInfo;
+                    countAtivos++;
+                } else {
+                    listTextInativos += adInfo;
+                    countInativos++;
                 }
             });
 
-            await message.reply(listText);
+            let finalText = `📢 *ANÚNCIOS DO GRUPO:*\n\n`;
+            
+            if (countAtivos > 0) {
+                finalText += `✅ *ATIVOS (${countAtivos}):*\n\n${listTextAtivos}`;
+            }
+            
+            if (countInativos > 0) {
+                finalText += `⏸️ *INATIVOS (${countInativos}):*\n\n${listTextInativos}`;
+            }
+
+            finalText += `📊 *Total:* ${countAtivos + countInativos} anúncios`;
+
+            await message.reply(finalText);
 
         } catch (error) {
             console.error('Erro ao listar anúncios:', error);
-            await message.reply('❌ Erro ao listar anúncios.');
+            await message.reply('❌ Erro ao listar anúncios. Verifique os logs.');
         }
     }
 
