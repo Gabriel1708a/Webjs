@@ -879,15 +879,56 @@ client.on('message_create', async (message) => {
                         const quotedMessage = await message.getQuotedMessage();
                         
                         if (quotedMessage.hasMedia) {
-                            // Mensagem com mídia
+                            // Mensagem com mídia - Compatibilidade com versão 1.31 Alpha
                             try {
+                                console.log('📥 Baixando mídia...');
                                 const media = await quotedMessage.downloadMedia();
-                                const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
+                                
+                                console.log('📊 Debug mídia:', {
+                                    mediaExists: !!media,
+                                    hasData: !!(media && media.data),
+                                    hasMimetype: !!(media && media.mimetype),
+                                    dataType: typeof (media && media.data),
+                                    dataLength: media && media.data ? media.data.length : 0
+                                });
+                                
+                                // Verificação robusta para diferentes versões da API
+                                if (!media) {
+                                    throw new Error('downloadMedia retornou null/undefined');
+                                }
+                                
+                                if (!media.data) {
+                                    throw new Error('Mídia não contém dados');
+                                }
+                                
+                                // Detectar mimetype se não existir (compatibilidade v1.31)
+                                let mimetype = media.mimetype;
+                                if (!mimetype) {
+                                    // Tentar detectar pelo tipo de dados ou usar padrão
+                                    if (typeof media.data === 'string' && media.data.startsWith('/9j/')) {
+                                        mimetype = 'image/jpeg';
+                                    } else if (typeof media.data === 'string' && media.data.startsWith('iVBORw0KGgo')) {
+                                        mimetype = 'image/png';
+                                    } else if (typeof media.data === 'string' && media.data.startsWith('UklGR')) {
+                                        mimetype = 'video/webm';
+                                    } else {
+                                        mimetype = 'application/octet-stream';
+                                    }
+                                    console.log(`🔍 Mimetype detectado: ${mimetype}`);
+                                }
+                                
+                                const filename = media.filename || 'arquivo';
+                                
+                                console.log(`📤 Enviando: ${mimetype} (${filename})`);
+                                
+                                const messageMedia = new MessageMedia(mimetype, media.data, filename);
                                 
                                 await client.sendMessage(groupId, messageMedia, {
                                     caption: quotedMessage.body || '',
                                     mentions: mentions2
                                 });
+                                
+                                console.log('✅ Mídia enviada com sucesso!');
                             } catch (mediaError) {
                                 console.log(`⚠️ Erro ao processar mídia (${mediaError.message}), tentando apenas texto...`);
                                 // Se falhar com mídia, enviar só o texto da mensagem
