@@ -1,6 +1,6 @@
 const axios = require('axios');
 const config = require('../config.json');
-const Logger = require('../utils/Logger');
+const chalk = require('chalk');
 
 class TaskHandler {
     constructor(client) {
@@ -12,7 +12,7 @@ class TaskHandler {
      * Inicia o loop que verifica por novas tarefas a cada 5 segundos.
      */
     start() {
-        Logger.info('[TAREFAS] Iniciando o verificador de tarefas do painel...');
+        console.log(chalk.blue('[TAREFAS] Iniciando o verificador de tarefas do painel...'));
         // Executa uma vez imediatamente
         this.fetchAndProcessTasks(); 
         // E depois executa a cada 5 segundos (tempo mínimo para evitar sobrecarga)
