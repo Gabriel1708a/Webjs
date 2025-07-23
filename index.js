@@ -880,67 +880,14 @@ client.on('message_create', async (message) => {
                         
                         if (quotedMessage.hasMedia) {
                             // Mensagem com mídia
-                            try {
-                                console.log('📥 Baixando mídia da mensagem citada...');
-                                
-                                // Tentar múltiplas abordagens para baixar a mídia
-                                let media = null;
-                                
-                                // Primeira tentativa: método padrão
-                                try {
-                                    media = await quotedMessage.downloadMedia();
-                                } catch (downloadError) {
-                                    console.log('⚠️ Primeira tentativa falhou, tentando alternativa...');
-                                }
-                                
-                                // Segunda tentativa: com timeout maior
-                                if (!media || !media.data) {
-                                    try {
-                                        media = await Promise.race([
-                                            quotedMessage.downloadMedia(),
-                                            new Promise((_, reject) => 
-                                                setTimeout(() => reject(new Error('Timeout')), 15000)
-                                            )
-                                        ]);
-                                    } catch (timeoutError) {
-                                        console.log('⚠️ Segunda tentativa falhou também...');
-                                    }
-                                }
-                                
-                                // Verificar se conseguiu baixar
-                                if (!media || !media.data) {
-                                    throw new Error('Não foi possível baixar a mídia após múltiplas tentativas');
-                                }
-                                
-                                console.log('✅ Mídia baixada com sucesso!');
-                                
-                                // Se não tem mimetype, tentar detectar ou usar padrão
-                                const mimetype = media.mimetype || 'application/octet-stream';
-                                const filename = media.filename || 'arquivo';
-                                
-                                console.log(`📤 Enviando mídia: ${mimetype} (${filename}) - ${media.data.length} bytes`);
-                                
-                                const messageMedia = new MessageMedia(mimetype, media.data, filename);
-                                
-                                await client.sendMessage(groupId, messageMedia, {
-                                    caption: quotedMessage.body || '',
-                                    mentions: mentions2
-                                });
-                                
-                                console.log('✅ Mídia enviada com sucesso para o grupo!');
-                            } catch (mediaError) {
-                                console.log(`❌ Erro ao processar mídia: ${mediaError.message}`);
-                                // Fallback: enviar apenas o texto se houver
-                                if (quotedMessage.body) {
-                                    console.log('📝 Enviando apenas texto como fallback...');
-                                    await client.sendMessage(groupId, quotedMessage.body, {
-                                        mentions: mentions2
-                                    });
-                                } else {
-                                    await message.reply('❌ Não foi possível processar a mídia da mensagem citada. Tente novamente.');
-                                    return;
-                                }
-                            }
+                            // Método original simplificado que funcionava antes
+                            const media = await quotedMessage.downloadMedia();
+                            const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
+                            
+                            await client.sendMessage(groupId, messageMedia, {
+                                caption: quotedMessage.body || '',
+                                mentions: mentions2
+                            });
                         } else {
                             // Mensagem de texto
                             await client.sendMessage(groupId, quotedMessage.body, {
