@@ -881,23 +881,41 @@ client.on('message_create', async (message) => {
                         if (quotedMessage.hasMedia) {
                             // Mensagem com mídia
                             try {
+                                console.log('📥 Baixando mídia da mensagem citada...');
                                 const media = await quotedMessage.downloadMedia();
                                 
-                                // Verificar se o media foi baixado corretamente
-                                if (!media || !media.mimetype || !media.data) {
-                                    throw new Error('Não foi possível baixar a mídia da mensagem citada');
+                                console.log('📊 Dados da mídia:', {
+                                    hasMedia: !!media,
+                                    hasMimetype: !!(media && media.mimetype),
+                                    hasData: !!(media && media.data),
+                                    mimetype: media ? media.mimetype : 'undefined',
+                                    dataLength: media && media.data ? media.data.length : 0
+                                });
+                                
+                                // Verificação mais flexível - só precisa ter dados
+                                if (!media || !media.data) {
+                                    throw new Error('Mídia não contém dados válidos');
                                 }
                                 
-                                const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename || 'arquivo');
+                                // Se não tem mimetype, tentar detectar ou usar padrão
+                                const mimetype = media.mimetype || 'application/octet-stream';
+                                const filename = media.filename || 'arquivo';
+                                
+                                console.log(`📤 Enviando mídia: ${mimetype} (${filename})`);
+                                
+                                const messageMedia = new MessageMedia(mimetype, media.data, filename);
                                 
                                 await client.sendMessage(groupId, messageMedia, {
                                     caption: quotedMessage.body || '',
                                     mentions: mentions2
                                 });
+                                
+                                console.log('✅ Mídia enviada com sucesso!');
                             } catch (mediaError) {
-                                console.log(`⚠️ Erro ao processar mídia: ${mediaError.message}`);
+                                console.log(`❌ Erro ao processar mídia: ${mediaError.message}`);
                                 // Fallback: enviar apenas o texto se houver
                                 if (quotedMessage.body) {
+                                    console.log('📝 Enviando apenas texto como fallback...');
                                     await client.sendMessage(groupId, quotedMessage.body, {
                                         mentions: mentions2
                                     });
