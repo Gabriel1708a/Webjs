@@ -399,41 +399,48 @@ client.on('ready', async () => {
     
     Logger.info('Módulos de comandos carregados');
     
-    // Carregar sistemas automáticos
-    await adsHandler.loadAllAds(client);
-    await groupControlHandler.loadSchedules(client);
-    await horariosHandler.loadAutoHours(client);
-    await loadNotifiedUsers(); // Carregar usuários já notificados
-    
-    Logger.success('Sistemas automáticos inicializados');
-    
-    // Notificar painel Laravel
-    await notificarPainelLaravel();
-    
-    // Inicializar módulo de envio centralizado
+    // Inicializar módulo de envio centralizado primeiro (crítico)
     Sender.initialize(client);
     Logger.success('Módulo de envio centralizado inicializado');
+    
+    // Carregar sistemas automáticos em paralelo para ser mais rápido
+    await Promise.all([
+        adsHandler.loadAllAds(client),
+        groupControlHandler.loadSchedules(client),
+        horariosHandler.loadAutoHours(client),
+        loadNotifiedUsers()
+    ]);
+    
+    Logger.success('Sistemas automáticos inicializados');
     
     // Inicializar serviço de mensagens automáticas híbrido (Laravel + Local)
     await AutoMessageHandler.initialize(DataManager);
     Logger.success('Serviço de mensagens automáticas híbrido inicializado');
     
-    // Inicializar handler do painel para entrada em grupos
-    PanelHandler.initialize();
-    Logger.success('Handler do painel inicializado');
+    // Notificar painel Laravel de forma não-bloqueante
+    notificarPainelLaravel().catch(err => 
+        console.log(`⚠️ Falha ao notificar painel: ${err.message}`)
+    );
     
-    // Inicializar handler de tarefas do painel
-    const taskHandler = new TaskHandler(client);
-    taskHandler.start();
-    Logger.info('Handler de tarefas do painel inicializado (verificação a cada 5s)');
-    
-    // --- [NOVA LÓGICA DE SINCRONIZAÇÃO] ---
-    // Cria uma instância do nosso handler, passando 30000 milissegundos (30 segundos)
-    const syncHandler = new SyncHandler(30000); 
+    // Inicializar handlers essenciais de forma não-bloqueante
+    setTimeout(() => {
+        // Inicializar handler do painel para entrada em grupos
+        PanelHandler.initialize();
+        Logger.success('Handler do painel inicializado');
         
-    // Inicia o processo de sincronização automática
-    syncHandler.start();
-    Logger.success('Sincronização automática inicializada');
+        // Inicializar handler de tarefas do painel
+        const taskHandler = new TaskHandler(client);
+        taskHandler.start();
+        Logger.info('Handler de tarefas do painel inicializado (verificação a cada 5s)');
+        
+        // --- [NOVA LÓGICA DE SINCRONIZAÇÃO] ---
+        // Cria uma instância do nosso handler, passando 30000 milissegundos (30 segundos)
+        const syncHandler = new SyncHandler(30000); 
+            
+        // Inicia o processo de sincronização automática
+        syncHandler.start();
+        Logger.success('Sincronização automática inicializada');
+    }, 1000); // Aguarda 1 segundo para não bloquear a inicialização principal
     // --- [FIM DA NOVA LÓGICA] ---
     
     // Inicializar sistema unificado de anúncios
@@ -460,7 +467,10 @@ client.on('disconnected', (reason) => {
 
 // Eventos adicionais para logs detalhados
 client.on('loading_screen', (percent, message) => {
-    Logger.info(`Carregando: ${percent}% - ${message}`);
+    // Só mostrar logs importantes para evitar spam
+    if (percent === 100 || percent % 25 === 0) {
+        Logger.info(`Carregando: ${percent}% - ${message}`);
+    }
 });
 
 client.on('authenticated', () => {
@@ -468,7 +478,10 @@ client.on('authenticated', () => {
 });
 
 client.on('change_state', (state) => {
-    Logger.info(`Status do cliente: ${state}`);
+    // Só logar mudanças importantes de estado
+    if (['CONNECTED', 'OPENING', 'CONFLICT', 'UNLAUNCHED'].includes(state)) {
+        Logger.info(`Status do cliente: ${state}`);
+    }
 });
 
 // Processamento de mensagens
