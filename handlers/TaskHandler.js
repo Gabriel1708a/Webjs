@@ -44,19 +44,13 @@ class TaskHandler {
             if (task.task_type === 'join_group') {
                 console.log(`[TAREFAS] Processando: Entrar no grupo com identificador ${payload.identifier}`);
                 
-                // [LÓGICA ATUALIZADA E ROBUSTA]
                 let chat;
-                
-                // Tenta aceitar o convite.
                 const inviteResult = await this.client.acceptInvite(payload.identifier);
 
                 if (inviteResult && inviteResult.id) {
-                    // Caso 1: O bot entrou no grupo com sucesso.
                     console.log('[TAREFAS] Convite aceito com sucesso.');
                     chat = await this.client.getChatById(inviteResult.id);
                 } else {
-                    // Caso 2: O bot já está no grupo ou o convite é inválido.
-                    // Vamos tentar encontrar o grupo pelo ID do convite.
                     console.log('[TAREFAS] Convite não retornou um chat. Verificando se já estou no grupo...');
                     const allChats = await this.client.getChats();
                     const existingGroup = allChats.find(c => c.isGroup && c.groupMetadata?.inviteCode === payload.identifier);
@@ -65,12 +59,10 @@ class TaskHandler {
                         console.log('[TAREFAS] Já estou no grupo. Usando dados existentes.');
                         chat = existingGroup;
                     } else {
-                        // Se não encontrou de nenhuma forma, o convite é inválido.
                         throw new Error('Convite inválido ou expirado. Não foi possível entrar ou encontrar o grupo.');
                     }
                 }
 
-                // Se chegamos aqui, a variável 'chat' deve ser válida.
                 if (!chat || !chat.isGroup) {
                     throw new Error('Não foi possível obter os detalhes do grupo.');
                 }
@@ -94,15 +86,26 @@ class TaskHandler {
 
     async updateTaskStatus(taskId, status, result = {}) {
         try {
-            await axios.post(`${config.laravelApi.baseUrl}/tasks/update`, {
-                task_id: taskId,
-                status: status,
-                result: result
-            }, {
-                headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
-            });
+            // [CORREÇÃO] A chamada axios.post foi ajustada para o formato correto.
+            // O segundo argumento é o corpo da requisição (os dados).
+            // O terceiro argumento é o objeto de configuração (com os headers).
+            const response = await axios.post(
+                `${config.laravelApi.baseUrl}/tasks/update`, 
+                { // Corpo da requisição
+                    task_id: taskId,
+                    status: status,
+                    result: result
+                },
+                { // Configuração
+                    headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
+                }
+            );
+            console.log(`[TAREFAS] Status da tarefa ${taskId} atualizado para '${status}' no painel.`);
+            return response.data;
+
         } catch (error) {
-            console.error(`[TAREFAS] Erro CRÍTICO ao ATUALIZAR status da tarefa ${taskId}:`, error.response?.data?.message || error.message);
+            // Log detalhado do erro da API
+            console.error(`[TAREFAS] Erro CRÍTICO ao ATUALIZAR status da tarefa ${taskId}:`, error.response?.data || error.message);
         }
     }
 }
