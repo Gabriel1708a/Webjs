@@ -58,6 +58,10 @@ class MenuHandler {
 🔨 !ban – Banir (responder mensagem)
 🗑️ !apagar – Apagar mensagem (responder)
 
+📋 *INFORMAÇÕES DO GRUPO:*
+🔗 !linkgp – Gerar link do grupo
+🆔 !id – Mostrar ID do grupo (só admins)
+
 🔒 *CONTROLE DE ACESSO:*
 👑 !soadm 1/0 – Modo só admin (comandos interativos)
 🔓 Quando ativado, apenas admins usam comandos interativos

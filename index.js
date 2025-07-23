@@ -577,6 +577,63 @@ client.on('message_create', async (message) => {
                 await syncPanelHandler.handle(client, message, command, args);
                 break;
 
+            case 'linkgp':
+                try {
+                    // Verificar modo SOADM para comando !linkgp
+                    const soadmStatusLink = await DataManager.loadConfig(groupId, 'soadm');
+                    const isOwnerLink = Utils.isOwner(message);
+                    const isAdminLink = await Utils.isAdmin(message);
+                    
+                    // Se SOADM ativado e usuário não é admin/dono, bloquear
+                    if ((soadmStatusLink === '1' || soadmStatusLink === 1) && !isAdminLink && !isOwnerLink) {
+                        await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
+                        return;
+                    }
+
+                    const chat = await message.getChat();
+                    if (!chat.isGroup) {
+                        await message.reply('❌ Este comando só funciona em grupos.');
+                        return;
+                    }
+
+                    // Gerar link de convite do grupo
+                    const inviteCode = await chat.getInviteCode();
+                    const groupLink = `https://chat.whatsapp.com/${inviteCode}`;
+                    
+                    await message.reply(`🔗 *Link do Grupo:*\n\n${groupLink}\n\n📋 *Nome:* ${chat.name}\n👥 *Participantes:* ${chat.participants.length}`);
+                    
+                    Logger.command(Utils.getUsername(message), '!linkgp', Utils.getGroupName(groupId));
+                    
+                } catch (error) {
+                    Logger.error(`Erro no comando !linkgp: ${error.message}`);
+                    await message.reply('❌ Erro ao gerar link do grupo. Verifique se sou administrador.');
+                }
+                break;
+
+            case 'id':
+                // Verificar se é admin ou dono
+                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
+                    await message.reply('🚫 Apenas administradores podem usar este comando.');
+                    return;
+                }
+
+                try {
+                    const chat = await message.getChat();
+                    if (!chat.isGroup) {
+                        await message.reply('❌ Este comando só funciona em grupos.');
+                        return;
+                    }
+
+                    await message.reply(`🆔 *ID do Grupo:*\n\n\`${groupId}\`\n\n📋 *Nome:* ${chat.name}\n👥 *Participantes:* ${chat.participants.length}`);
+                    
+                    Logger.command(Utils.getUsername(message), '!id', Utils.getGroupName(groupId));
+                    
+                } catch (error) {
+                    Logger.error(`Erro no comando !id: ${error.message}`);
+                    await message.reply('❌ Erro ao obter ID do grupo.');
+                }
+                break;
+
             case 'sorte':
                 // Verificar modo SOADM
                 const soadmStatus = await DataManager.loadConfig(groupId, 'soadm');
