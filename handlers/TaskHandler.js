@@ -42,29 +42,21 @@ class TaskHandler {
             const payload = task.payload;
 
             if (task.task_type === 'join_group') {
-                console.log(`[TAREFAS] Processando: Entrar no grupo com identificador ${payload.identifier}`);
+                const identifier = payload.identifier;
+                console.log(`[TAREFAS] Processando: Entrar no grupo com identificador limpo: ${identifier}`);
                 
-                let chat;
-                const inviteResult = await this.client.acceptInvite(payload.identifier);
+                // A função acceptInvite retorna o ID do grupo (ex: ...@g.us)
+                const groupId = await this.client.acceptInvite(identifier);
 
-                if (inviteResult && inviteResult.id) {
-                    console.log('[TAREFAS] Convite aceito com sucesso.');
-                    chat = await this.client.getChatById(inviteResult.id);
-                } else {
-                    console.log('[TAREFAS] Convite não retornou um chat. Verificando se já estou no grupo...');
-                    const allChats = await this.client.getChats();
-                    const existingGroup = allChats.find(c => c.isGroup && c.groupMetadata?.inviteCode === payload.identifier);
-
-                    if (existingGroup) {
-                        console.log('[TAREFAS] Já estou no grupo. Usando dados existentes.');
-                        chat = existingGroup;
-                    } else {
-                        throw new Error('Convite inválido ou expirado. Não foi possível entrar ou encontrar o grupo.');
-                    }
+                if (!groupId || typeof groupId !== 'string') {
+                    throw new Error('acceptInvite falhou. O convite pode ser inválido, expirado, ou o bot já está no grupo.');
                 }
 
+                console.log(`[TAREFAS] Convite aceito. ID do grupo: ${groupId}. Buscando detalhes...`);
+                const chat = await this.client.getChatById(groupId);
+
                 if (!chat || !chat.isGroup) {
-                    throw new Error('Não foi possível obter os detalhes do grupo.');
+                    throw new Error(`Não foi possível obter os detalhes do chat para o ID: ${groupId}`);
                 }
 
                 const realGroupId = chat.id._serialized;
@@ -86,25 +78,14 @@ class TaskHandler {
 
     async updateTaskStatus(taskId, status, result = {}) {
         try {
-            // [CORREÇÃO] A chamada axios.post foi ajustada para o formato correto.
-            // O segundo argumento é o corpo da requisição (os dados).
-            // O terceiro argumento é o objeto de configuração (com os headers).
             const response = await axios.post(
                 `${config.laravelApi.baseUrl}/tasks/update`, 
-                { // Corpo da requisição
-                    task_id: taskId,
-                    status: status,
-                    result: result
-                },
-                { // Configuração
-                    headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
-                }
+                { task_id: taskId, status: status, result: result },
+                { headers: { 'Authorization': `Bearer ${config.laravelApi.token}` } }
             );
             console.log(`[TAREFAS] Status da tarefa ${taskId} atualizado para '${status}' no painel.`);
             return response.data;
-
         } catch (error) {
-            // Log detalhado do erro da API
             console.error(`[TAREFAS] Erro CRÍTICO ao ATUALIZAR status da tarefa ${taskId}:`, error.response?.data || error.message);
         }
     }
