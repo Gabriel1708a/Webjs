@@ -882,26 +882,43 @@ client.on('message_create', async (message) => {
                             // Mensagem com mídia
                             try {
                                 console.log('📥 Baixando mídia da mensagem citada...');
-                                const media = await quotedMessage.downloadMedia();
                                 
-                                console.log('📊 Dados da mídia:', {
-                                    hasMedia: !!media,
-                                    hasMimetype: !!(media && media.mimetype),
-                                    hasData: !!(media && media.data),
-                                    mimetype: media ? media.mimetype : 'undefined',
-                                    dataLength: media && media.data ? media.data.length : 0
-                                });
+                                // Tentar múltiplas abordagens para baixar a mídia
+                                let media = null;
                                 
-                                // Verificação mais flexível - só precisa ter dados
-                                if (!media || !media.data) {
-                                    throw new Error('Mídia não contém dados válidos');
+                                // Primeira tentativa: método padrão
+                                try {
+                                    media = await quotedMessage.downloadMedia();
+                                } catch (downloadError) {
+                                    console.log('⚠️ Primeira tentativa falhou, tentando alternativa...');
                                 }
+                                
+                                // Segunda tentativa: com timeout maior
+                                if (!media || !media.data) {
+                                    try {
+                                        media = await Promise.race([
+                                            quotedMessage.downloadMedia(),
+                                            new Promise((_, reject) => 
+                                                setTimeout(() => reject(new Error('Timeout')), 15000)
+                                            )
+                                        ]);
+                                    } catch (timeoutError) {
+                                        console.log('⚠️ Segunda tentativa falhou também...');
+                                    }
+                                }
+                                
+                                // Verificar se conseguiu baixar
+                                if (!media || !media.data) {
+                                    throw new Error('Não foi possível baixar a mídia após múltiplas tentativas');
+                                }
+                                
+                                console.log('✅ Mídia baixada com sucesso!');
                                 
                                 // Se não tem mimetype, tentar detectar ou usar padrão
                                 const mimetype = media.mimetype || 'application/octet-stream';
                                 const filename = media.filename || 'arquivo';
                                 
-                                console.log(`📤 Enviando mídia: ${mimetype} (${filename})`);
+                                console.log(`📤 Enviando mídia: ${mimetype} (${filename}) - ${media.data.length} bytes`);
                                 
                                 const messageMedia = new MessageMedia(mimetype, media.data, filename);
                                 
@@ -910,7 +927,7 @@ client.on('message_create', async (message) => {
                                     mentions: mentions2
                                 });
                                 
-                                console.log('✅ Mídia enviada com sucesso!');
+                                console.log('✅ Mídia enviada com sucesso para o grupo!');
                             } catch (mediaError) {
                                 console.log(`❌ Erro ao processar mídia: ${mediaError.message}`);
                                 // Fallback: enviar apenas o texto se houver
@@ -920,7 +937,7 @@ client.on('message_create', async (message) => {
                                         mentions: mentions2
                                     });
                                 } else {
-                                    await message.reply('❌ Não foi possível processar a mídia da mensagem citada.');
+                                    await message.reply('❌ Não foi possível processar a mídia da mensagem citada. Tente novamente.');
                                     return;
                                 }
                             }
