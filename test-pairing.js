@@ -7,10 +7,10 @@ console.log('');
 console.log(`📱 Número configurado: ${config.numeroBot}`);
 console.log('');
 
-// Cliente simplificado apenas para pareamento
+// Cliente simplificado apenas para pareamento (MESMO clientId do index.js)
 const client = new Client({
     authStrategy: new LocalAuth({
-        clientId: 'test-pairing'
+        clientId: 'bot-admin'
     }),
     puppeteer: {
         headless: true,
