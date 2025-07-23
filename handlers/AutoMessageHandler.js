@@ -26,8 +26,8 @@ class AutoMessageHandler {
         this.scheduleLocalAd = this.scheduleLocalAd.bind(this);
         this.sendLocalAd = this.sendLocalAd.bind(this);
 
-        // Iniciar busca híbrida
-        setInterval(this.fetchMessagesFromPanel, 10 * 1000); 
+        // Iniciar busca híbrida com intervalo otimizado
+        setInterval(this.fetchMessagesFromPanel, 30 * 1000); // 30s em vez de 10s
         
         this.fetchMessagesFromPanel();
     }
@@ -83,8 +83,13 @@ class AutoMessageHandler {
 
         // [SISTEMA HÍBRIDO] Se painel falhou ou está vazio, usar anúncios locais
         if (panelError || panelMessages.length === 0) {
-            console.log('🔄 Painel indisponível ou vazio. Carregando anúncios locais como fallback...');
-            await this.loadLocalAds();
+            // [OTIMIZAÇÃO] Só carregar anúncios locais se não estiverem já carregados
+            if (this.localAdsTimers.size === 0) {
+                console.log('🔄 Painel indisponível ou vazio. Carregando anúncios locais como fallback...');
+                await this.loadLocalAds();
+            } else {
+                console.log('📂 Painel indisponível, mas anúncios locais já estão rodando.');
+            }
         } else {
             // Painel funcionando - sincronizar mensagens do painel
             this.syncMessages(panelMessages);
@@ -265,7 +270,7 @@ class AutoMessageHandler {
     // ========================================
 
     /**
-     * Carrega e agenda anúncios locais do ads.json
+     * Carrega e agenda anúncios locais do ads.json (otimizado)
      */
     static async loadLocalAds() {
         if (!this.DataManager) {
@@ -284,18 +289,16 @@ class AutoMessageHandler {
 
             let totalActiveAds = 0;
 
-            // Processar anúncios de todos os grupos
+            // [OTIMIZAÇÃO] Processar anúncios de forma mais eficiente
             for (const [groupId, groupAds] of Object.entries(adsData.anuncios)) {
                 const activeAds = Object.values(groupAds).filter(ad => ad.ativo);
                 
                 if (activeAds.length > 0) {
-                    console.log(`📢 Grupo ${groupId}: ${activeAds.length} anúncio(s) ativo(s) encontrado(s)`);
+                    // [OTIMIZAÇÃO] Log resumido para não poluir console
+                    totalActiveAds += activeAds.length;
                     
-                    // Agendar cada anúncio ativo
-                    for (const ad of activeAds) {
-                        this.scheduleLocalAd(groupId, ad);
-                        totalActiveAds++;
-                    }
+                    // Agendar anúncios em lote
+                    activeAds.forEach(ad => this.scheduleLocalAd(groupId, ad));
                 }
             }
 
@@ -321,7 +324,8 @@ class AutoMessageHandler {
 
         const intervalMs = adData.intervalo * 60 * 1000; // Converter minutos para ms
         
-        console.log(`⏰ Agendando anúncio local ID ${adData.id} para grupo ${groupId} (${adData.intervalo} min)`);
+        // [OTIMIZAÇÃO] Log reduzido para melhor performance
+        // console.log(`⏰ Agendando anúncio local ID ${adData.id} para grupo ${groupId} (${adData.intervalo} min)`);
 
         // [CORREÇÃO] NÃO enviar imediatamente - apenas agendar
         // Agendar envios recorrentes
@@ -339,14 +343,14 @@ class AutoMessageHandler {
      */
     static async sendLocalAd(groupId, adData) {
         try {
-            console.log(`📢 Enviando anúncio local ID ${adData.id} para grupo ${groupId}`);
+            // [OTIMIZAÇÃO] Log reduzido para melhor performance
+            // console.log(`📢 Enviando anúncio local ID ${adData.id} para grupo ${groupId}`);
             
             let mediaUrl = null;
             if (adData.media && adData.media.data) {
                 // Converter dados de mídia para URL temporária se necessário
-                // Por enquanto, vamos apenas logar que tem mídia
-                console.log(`📷 Anúncio contém mídia (${adData.media.mimetype})`);
                 // TODO: Implementar conversão de dados base64 para URL se necessário
+                mediaUrl = null; // Por enquanto, sem mídia
             }
 
             const success = await Sender.sendMessage(
@@ -355,10 +359,9 @@ class AutoMessageHandler {
                 mediaUrl
             );
 
-            if (success) {
-                console.log(`✅ Anúncio local ID ${adData.id} enviado com sucesso`);
-            } else {
-                console.log(`❌ Falha ao enviar anúncio local ID ${adData.id}`);
+            // [OTIMIZAÇÃO] Log apenas em caso de erro
+            if (!success) {
+                console.log(`❌ Falha ao enviar anúncio local ID ${adData.id} para grupo ${groupId}`);
             }
 
         } catch (error) {
