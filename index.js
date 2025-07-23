@@ -425,7 +425,7 @@ client.on('ready', async () => {
     // Inicializar handler de tarefas do painel
     const taskHandler = new TaskHandler(client);
     taskHandler.start();
-    Logger.success('Handler de tarefas do painel inicializado (verificação a cada 5s)');
+    Logger.info('Handler de tarefas do painel inicializado (verificação a cada 5s)');
     
     // --- [NOVA LÓGICA DE SINCRONIZAÇÃO] ---
     // Cria uma instância do nosso handler, passando 30000 milissegundos (30 segundos)

@@ -24,7 +24,7 @@ class TaskHandler {
      */
     stop() {
         clearInterval(this.intervalId);
-        Logger.info('[TAREFAS] Verificador de tarefas parado.');
+        console.log(chalk.blue('[TAREFAS] Verificador de tarefas parado.'));
     }
 
     /**
@@ -39,14 +39,14 @@ class TaskHandler {
             const tasks = response.data.tasks;
 
             if (tasks && tasks.length > 0) {
-                Logger.info(`[TAREFAS] ${tasks.length} nova(s) tarefa(s) encontrada(s).`);
+                console.log(chalk.green(`[TAREFAS] ${tasks.length} nova(s) tarefa(s) encontrada(s).`));
                 // Processa as tarefas uma por uma em sequência
                 for (const task of tasks) {
                     await this.processTask(task);
                 }
             }
         } catch (error) {
-            Logger.error(`[TAREFAS] Erro ao buscar tarefas do painel: ${error.response?.data?.message || error.message}`);
+            console.log(chalk.red(`[TAREFAS] Erro ao buscar tarefas do painel: ${error.response?.data?.message || error.message}`));
         }
     }
 
@@ -62,13 +62,13 @@ class TaskHandler {
             const payload = task.payload; // O payload já vem como objeto JSON
 
             if (task.task_type === 'join_group') {
-                Logger.info(`[TAREFAS] Processando: Entrar no grupo com identificador ${payload.identifier}`);
+                console.log(chalk.yellow(`[TAREFAS] Processando: Entrar no grupo com identificador ${payload.identifier}`));
                 
                 // Usa a função do cliente para aceitar o convite ou entrar no grupo pelo ID
                 const chat = await this.client.acceptInvite(payload.identifier);
                 const realGroupId = chat.id._serialized; // Pega o ID real do grupo (ex: ...@g.us)
 
-                Logger.success(`[TAREFAS] SUCESSO! Entrei no grupo: ${realGroupId}`);
+                console.log(chalk.green(`[TAREFAS] SUCESSO! Entrei no grupo: ${realGroupId}`));
 
                 // Informa ao painel que a tarefa foi concluída com sucesso, enviando o ID real do grupo
                 await this.updateTaskStatus(task.id, 'completed', { real_group_id: realGroupId });
@@ -77,7 +77,7 @@ class TaskHandler {
             // else if (task.task_type === 'leave_group') { ... }
 
         } catch (error) {
-            Logger.error(`[TAREFAS] FALHA ao processar a tarefa ID ${task.id}: ${error.message}`);
+            console.log(chalk.red(`[TAREFAS] FALHA ao processar a tarefa ID ${task.id}: ${error.message}`));
             // Informa ao painel que a tarefa falhou, enviando a mensagem de erro
             await this.updateTaskStatus(task.id, 'failed', { error: error.message });
         }
@@ -99,7 +99,7 @@ class TaskHandler {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
             });
         } catch (error) {
-            Logger.error(`[TAREFAS] Erro CRÍTICO ao ATUALIZAR status da tarefa ${taskId}: ${error.response?.data?.message || error.message}`);
+            console.log(chalk.red(`[TAREFAS] Erro CRÍTICO ao ATUALIZAR status da tarefa ${taskId}: ${error.response?.data?.message || error.message}`));
         }
     }
 }
