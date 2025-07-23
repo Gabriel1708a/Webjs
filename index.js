@@ -882,9 +882,49 @@ client.on('message_create', async (message) => {
                             // Mensagem com mídia - Compatibilidade com versão 1.31 Alpha
                             try {
                                 console.log('📥 Baixando mídia...');
-                                const media = await quotedMessage.downloadMedia();
+                                console.log('📋 Tipo de mensagem:', quotedMessage.type);
+                                console.log('📋 HasMedia:', quotedMessage.hasMedia);
                                 
-                                console.log('📊 Debug mídia:', {
+                                // Múltiplas tentativas com diferentes abordagens para v1.31
+                                let media = null;
+                                
+                                // Tentativa 1: Método padrão
+                                try {
+                                    media = await quotedMessage.downloadMedia();
+                                    console.log('✅ Tentativa 1 - downloadMedia() funcionou');
+                                } catch (err1) {
+                                    console.log('⚠️ Tentativa 1 falhou:', err1.message);
+                                }
+                                
+                                // Tentativa 2: Com timeout maior
+                                if (!media) {
+                                    try {
+                                        console.log('🔄 Tentativa 2 - com timeout...');
+                                        media = await Promise.race([
+                                            quotedMessage.downloadMedia(),
+                                            new Promise((_, reject) => 
+                                                setTimeout(() => reject(new Error('Timeout de 20s')), 20000)
+                                            )
+                                        ]);
+                                        console.log('✅ Tentativa 2 funcionou');
+                                    } catch (err2) {
+                                        console.log('⚠️ Tentativa 2 falhou:', err2.message);
+                                    }
+                                }
+                                
+                                // Tentativa 3: Aguardar um pouco e tentar novamente
+                                if (!media) {
+                                    try {
+                                        console.log('🔄 Tentativa 3 - aguardando 2s...');
+                                        await new Promise(resolve => setTimeout(resolve, 2000));
+                                        media = await quotedMessage.downloadMedia();
+                                        console.log('✅ Tentativa 3 funcionou');
+                                    } catch (err3) {
+                                        console.log('⚠️ Tentativa 3 falhou:', err3.message);
+                                    }
+                                }
+                                
+                                console.log('📊 Debug mídia final:', {
                                     mediaExists: !!media,
                                     hasData: !!(media && media.data),
                                     hasMimetype: !!(media && media.mimetype),
@@ -892,13 +932,9 @@ client.on('message_create', async (message) => {
                                     dataLength: media && media.data ? media.data.length : 0
                                 });
                                 
-                                // Verificação robusta para diferentes versões da API
-                                if (!media) {
-                                    throw new Error('downloadMedia retornou null/undefined');
-                                }
-                                
-                                if (!media.data) {
-                                    throw new Error('Mídia não contém dados');
+                                // Verificação final
+                                if (!media || !media.data) {
+                                    throw new Error('Todas as tentativas de download falharam - mídia pode estar corrompida ou muito grande');
                                 }
                                 
                                 // Detectar mimetype se não existir (compatibilidade v1.31)
@@ -911,15 +947,19 @@ client.on('message_create', async (message) => {
                                         mimetype = 'image/png';
                                     } else if (typeof media.data === 'string' && media.data.startsWith('UklGR')) {
                                         mimetype = 'video/webm';
+                                    } else if (typeof media.data === 'string' && media.data.startsWith('AAAA')) {
+                                        mimetype = 'video/mp4';
                                     } else {
                                         mimetype = 'application/octet-stream';
                                     }
                                     console.log(`🔍 Mimetype detectado: ${mimetype}`);
+                                } else {
+                                    console.log(`📋 Mimetype original: ${mimetype}`);
                                 }
                                 
                                 const filename = media.filename || 'arquivo';
                                 
-                                console.log(`📤 Enviando: ${mimetype} (${filename})`);
+                                console.log(`📤 Enviando: ${mimetype} (${filename}) - ${media.data.length} bytes`);
                                 
                                 const messageMedia = new MessageMedia(mimetype, media.data, filename);
                                 
@@ -928,7 +968,7 @@ client.on('message_create', async (message) => {
                                     mentions: mentions2
                                 });
                                 
-                                console.log('✅ Mídia enviada com sucesso!');
+                                console.log('✅ Mídia enviada com sucesso para o grupo!');
                             } catch (mediaError) {
                                 console.log(`⚠️ Erro ao processar mídia (${mediaError.message}), tentando apenas texto...`);
                                 // Se falhar com mídia, enviar só o texto da mensagem
@@ -937,7 +977,7 @@ client.on('message_create', async (message) => {
                                         mentions: mentions2
                                     });
                                 } else {
-                                    await message.reply('❌ Erro ao processar mídia. Tente responder uma mensagem com texto.');
+                                    await message.reply('❌ Erro ao processar mídia. A mídia pode estar corrompida ou ser muito grande.');
                                     return;
                                 }
                             }
