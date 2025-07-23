@@ -880,13 +880,32 @@ client.on('message_create', async (message) => {
                         
                         if (quotedMessage.hasMedia) {
                             // Mensagem com mídia
-                            const media = await quotedMessage.downloadMedia();
-                            const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
-                            
-                            await client.sendMessage(groupId, messageMedia, {
-                                caption: quotedMessage.body || '',
-                                mentions: mentions2
-                            });
+                            try {
+                                const media = await quotedMessage.downloadMedia();
+                                
+                                // Verificar se o media foi baixado corretamente
+                                if (!media || !media.mimetype || !media.data) {
+                                    throw new Error('Não foi possível baixar a mídia da mensagem citada');
+                                }
+                                
+                                const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename || 'arquivo');
+                                
+                                await client.sendMessage(groupId, messageMedia, {
+                                    caption: quotedMessage.body || '',
+                                    mentions: mentions2
+                                });
+                            } catch (mediaError) {
+                                console.log(`⚠️ Erro ao processar mídia: ${mediaError.message}`);
+                                // Fallback: enviar apenas o texto se houver
+                                if (quotedMessage.body) {
+                                    await client.sendMessage(groupId, quotedMessage.body, {
+                                        mentions: mentions2
+                                    });
+                                } else {
+                                    await message.reply('❌ Não foi possível processar a mídia da mensagem citada.');
+                                    return;
+                                }
+                            }
                         } else {
                             // Mensagem de texto
                             await client.sendMessage(groupId, quotedMessage.body, {
