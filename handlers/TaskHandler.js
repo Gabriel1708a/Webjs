@@ -67,11 +67,16 @@ class TaskHandler {
                 // Usa a função do cliente para aceitar o convite ou entrar no grupo pelo ID
                 const chat = await this.client.acceptInvite(payload.identifier);
                 const realGroupId = chat.id._serialized; // Pega o ID real do grupo (ex: ...@g.us)
+                // [NOVO] Captura o nome do grupo
+                const groupName = chat.name;
 
-                console.log(chalk.green(`[TAREFAS] SUCESSO! Entrei no grupo: ${realGroupId}`));
+                console.log(chalk.green(`[TAREFAS] SUCESSO! Entrei no grupo "${groupName}" (${realGroupId})`));
 
-                // Informa ao painel que a tarefa foi concluída com sucesso, enviando o ID real do grupo
-                await this.updateTaskStatus(task.id, 'completed', { real_group_id: realGroupId });
+                // [ATUALIZADO] Envia o ID real E o nome do grupo de volta para o painel
+                await this.updateTaskStatus(task.id, 'completed', { 
+                    real_group_id: realGroupId,
+                    group_name: groupName 
+                });
             }
             // Futuramente, você pode adicionar outros tipos de tarefas aqui
             // else if (task.task_type === 'leave_group') { ... }
