@@ -287,14 +287,35 @@ class BanHandler {
                 await message.delete(true);
                 
                 if (shouldBan) {
-                    const chat = await message.getChat();
-                    await chat.removeParticipants([message.author]);
-                    await client.sendMessage(groupId, `🔨 *Usuário banido por ${reason}!*`);
+                    try {
+                        const chat = await message.getChat();
+                        
+                        // Verificar se o usuário ainda está no grupo antes de tentar remover
+                        const participants = chat.participants;
+                        const userInGroup = participants.find(p => p.id._serialized === message.author);
+                        
+                        if (userInGroup) {
+                            await chat.removeParticipants([message.author]);
+                            await client.sendMessage(groupId, `🔨 *Usuário banido por ${reason}!*`);
+                        } else {
+                            await client.sendMessage(groupId, `⚠️ *Usuário já saiu do grupo. Mensagem removida por ${reason}*`);
+                        }
+                    } catch (banError) {
+                        console.log(`⚠️ Não foi possível banir usuário: ${banError.message}`);
+                        await client.sendMessage(groupId, `🗑️ *Mensagem removida: ${reason}* (Não foi possível banir usuário)`);
+                    }
                 } else {
                     await client.sendMessage(groupId, `🗑️ *Mensagem removida: ${reason}*`);
                 }
             } catch (error) {
-                console.error('Erro na moderação automática:', error);
+                console.log(`❌ Erro na moderação automática: ${error.message}`);
+                // Tentar pelo menos deletar a mensagem se possível
+                try {
+                    await message.delete(true);
+                    console.log('✅ Mensagem deletada com sucesso apesar do erro');
+                } catch (deleteError) {
+                    console.log(`⚠️ Não foi possível deletar mensagem: ${deleteError.message}`);
+                }
             }
         }
     }
