@@ -1,99 +1,97 @@
 const axios = require('axios');
 const config = require('../config.json');
-const chalk = require('chalk');
 
 class TaskHandler {
     constructor(client) {
-        this.client = client; // O cliente 'whatsapp-web.js'
-        this.intervalId = null; // Para guardar o ID do nosso timer
+        this.client = client;
+        this.intervalId = null;
     }
 
-    /**
-     * Inicia o loop que verifica por novas tarefas a cada 5 segundos.
-     */
     start() {
-        console.log(chalk.blue('[TAREFAS] Iniciando o verificador de tarefas do painel...'));
-        // Executa uma vez imediatamente
+        console.log('[TAREFAS] Iniciando o verificador de tarefas do painel...');
         this.fetchAndProcessTasks(); 
-        // E depois executa a cada 5 segundos (tempo mínimo para evitar sobrecarga)
-        this.intervalId = setInterval(() => this.fetchAndProcessTasks(), 5 * 1000);
+        this.intervalId = setInterval(() => this.fetchAndProcessTasks(), 60 * 1000);
     }
 
-    /**
-     * Para o loop de verificação de tarefas.
-     */
     stop() {
         clearInterval(this.intervalId);
-        console.log(chalk.blue('[TAREFAS] Verificador de tarefas parado.'));
+        console.log('[TAREFAS] Verificador de tarefas parado.');
     }
 
-    /**
-     * Busca tarefas pendentes na API do painel e as processa.
-     */
     async fetchAndProcessTasks() {
         try {
             const response = await axios.get(`${config.laravelApi.baseUrl}/tasks/pending`, {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
             });
-
             const tasks = response.data.tasks;
-
             if (tasks && tasks.length > 0) {
-                console.log(chalk.green(`[TAREFAS] ${tasks.length} nova(s) tarefa(s) encontrada(s).`));
-                // Processa as tarefas uma por uma em sequência
+                console.log(`[TAREFAS] ${tasks.length} nova(s) tarefa(s) encontrada(s).`);
                 for (const task of tasks) {
                     await this.processTask(task);
                 }
             }
         } catch (error) {
-            console.log(chalk.red(`[TAREFAS] Erro ao buscar tarefas do painel: ${error.response?.data?.message || error.message}`));
+            console.error('[TAREFAS] Erro ao buscar tarefas do painel:', error.response?.data?.message || error.message);
         }
     }
 
-    /**
-     * Executa uma tarefa específica com base no seu tipo.
-     * @param {object} task - O objeto da tarefa vindo da API.
-     */
     async processTask(task) {
-        // Informa ao painel que começamos a processar esta tarefa
         await this.updateTaskStatus(task.id, 'processing');
 
         try {
-            const payload = task.payload; // O payload já vem como objeto JSON
+            const payload = task.payload;
 
             if (task.task_type === 'join_group') {
-                console.log(chalk.yellow(`[TAREFAS] Processando: Entrar no grupo com identificador ${payload.identifier}`));
+                console.log(`[TAREFAS] Processando: Entrar no grupo com identificador ${payload.identifier}`);
                 
-                // Usa a função do cliente para aceitar o convite ou entrar no grupo pelo ID
-                const chat = await this.client.acceptInvite(payload.identifier);
-                const realGroupId = chat.id._serialized; // Pega o ID real do grupo (ex: ...@g.us)
-                // [NOVO] Captura o nome do grupo
-                const groupName = chat.name;
+                // [LÓGICA ATUALIZADA E ROBUSTA]
+                let chat;
+                
+                // Tenta aceitar o convite.
+                const inviteResult = await this.client.acceptInvite(payload.identifier);
 
-                console.log(chalk.green(`[TAREFAS] SUCESSO! Entrei no grupo "${groupName}" (${realGroupId})`));
+                if (inviteResult && inviteResult.id) {
+                    // Caso 1: O bot entrou no grupo com sucesso.
+                    console.log('[TAREFAS] Convite aceito com sucesso.');
+                    chat = await this.client.getChatById(inviteResult.id);
+                } else {
+                    // Caso 2: O bot já está no grupo ou o convite é inválido.
+                    // Vamos tentar encontrar o grupo pelo ID do convite.
+                    console.log('[TAREFAS] Convite não retornou um chat. Verificando se já estou no grupo...');
+                    const allChats = await this.client.getChats();
+                    const existingGroup = allChats.find(c => c.isGroup && c.groupMetadata?.inviteCode === payload.identifier);
 
-                // [ATUALIZADO] Envia o ID real E o nome do grupo de volta para o painel
+                    if (existingGroup) {
+                        console.log('[TAREFAS] Já estou no grupo. Usando dados existentes.');
+                        chat = existingGroup;
+                    } else {
+                        // Se não encontrou de nenhuma forma, o convite é inválido.
+                        throw new Error('Convite inválido ou expirado. Não foi possível entrar ou encontrar o grupo.');
+                    }
+                }
+
+                // Se chegamos aqui, a variável 'chat' deve ser válida.
+                if (!chat || !chat.isGroup) {
+                    throw new Error('Não foi possível obter os detalhes do grupo.');
+                }
+
+                const realGroupId = chat.id._serialized;
+                const groupName = chat.name; 
+
+                console.log(`[TAREFAS] SUCESSO! Dados do grupo "${groupName}" (${realGroupId}) obtidos.`);
+
                 await this.updateTaskStatus(task.id, 'completed', { 
                     real_group_id: realGroupId,
                     group_name: groupName 
                 });
             }
-            // Futuramente, você pode adicionar outros tipos de tarefas aqui
-            // else if (task.task_type === 'leave_group') { ... }
 
         } catch (error) {
-            console.log(chalk.red(`[TAREFAS] FALHA ao processar a tarefa ID ${task.id}: ${error.message}`));
-            // Informa ao painel que a tarefa falhou, enviando a mensagem de erro
+            console.error(`[TAREFAS] FALHA ao processar a tarefa ID ${task.id}:`, error.message);
             await this.updateTaskStatus(task.id, 'failed', { error: error.message });
         }
     }
 
-    /**
-     * Envia uma atualização de status para a API do painel.
-     * @param {number} taskId - O ID da tarefa.
-     * @param {string} status - O novo status ('processing', 'completed', 'failed').
-     * @param {object} result - Um objeto com os resultados (ex: { real_group_id: '...' } ou { error: '...' }).
-     */
     async updateTaskStatus(taskId, status, result = {}) {
         try {
             await axios.post(`${config.laravelApi.baseUrl}/tasks/update`, {
@@ -104,7 +102,7 @@ class TaskHandler {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
             });
         } catch (error) {
-            console.log(chalk.red(`[TAREFAS] Erro CRÍTICO ao ATUALIZAR status da tarefa ${taskId}: ${error.response?.data?.message || error.message}`));
+            console.error(`[TAREFAS] Erro CRÍTICO ao ATUALIZAR status da tarefa ${taskId}:`, error.response?.data?.message || error.message);
         }
     }
 }
