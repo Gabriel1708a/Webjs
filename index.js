@@ -47,6 +47,9 @@ const Sender = require('./Sender');
 // Importar handler do painel para entrada em grupos
 const PanelHandler = require('./handlers/PanelHandler');
 
+// Importar handler de tarefas do painel
+const TaskHandler = require('./handlers/TaskHandler');
+
 // Importar handler de sincronização automática
 const SyncHandler = require('./handlers/SyncHandler');
 
@@ -418,6 +421,11 @@ client.on('ready', async () => {
     // Inicializar handler do painel para entrada em grupos
     PanelHandler.initialize();
     Logger.success('Handler do painel inicializado');
+    
+    // Inicializar handler de tarefas do painel
+    const taskHandler = new TaskHandler(client);
+    taskHandler.start();
+    Logger.success('Handler de tarefas do painel inicializado (verificação a cada 5s)');
     
     // --- [NOVA LÓGICA DE SINCRONIZAÇÃO] ---
     // Cria uma instância do nosso handler, passando 30000 milissegundos (30 segundos)
