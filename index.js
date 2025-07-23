@@ -880,14 +880,26 @@ client.on('message_create', async (message) => {
                         
                         if (quotedMessage.hasMedia) {
                             // Mensagem com mídia
-                            // Método original simplificado que funcionava antes
-                            const media = await quotedMessage.downloadMedia();
-                            const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
-                            
-                            await client.sendMessage(groupId, messageMedia, {
-                                caption: quotedMessage.body || '',
-                                mentions: mentions2
-                            });
+                            try {
+                                const media = await quotedMessage.downloadMedia();
+                                const messageMedia = new MessageMedia(media.mimetype, media.data, media.filename);
+                                
+                                await client.sendMessage(groupId, messageMedia, {
+                                    caption: quotedMessage.body || '',
+                                    mentions: mentions2
+                                });
+                            } catch (mediaError) {
+                                console.log(`⚠️ Erro ao processar mídia (${mediaError.message}), tentando apenas texto...`);
+                                // Se falhar com mídia, enviar só o texto da mensagem
+                                if (quotedMessage.body) {
+                                    await client.sendMessage(groupId, quotedMessage.body, {
+                                        mentions: mentions2
+                                    });
+                                } else {
+                                    await message.reply('❌ Erro ao processar mídia. Tente responder uma mensagem com texto.');
+                                    return;
+                                }
+                            }
                         } else {
                             // Mensagem de texto
                             await client.sendMessage(groupId, quotedMessage.body, {
