@@ -1,6 +1,6 @@
 const axios = require('axios');
-const Sender = require('../Sender');
-const config = require('../config.json'); // Usar config centralizado
+const Sender = require('../utils/Sender');
+const config = require('../config/config.json'); // Usar config centralizado
 
 class AutoMessageHandler {
     static activeMessages = new Map(); // Armazena as mensagens e seus timers

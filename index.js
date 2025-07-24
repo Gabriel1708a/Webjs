@@ -389,7 +389,7 @@ client.on('ready', async () => {
     welcomeHandler = require('./commands/welcome');
     banHandler = require('./commands/ban');
     sorteioHandler = require('./commands/sorteio');
-    adsHandler = require('./commands/ads');
+            adsHandler = require('./handlers/AdsHandler');
     menuHandler = require('./commands/menu');
     groupControlHandler = require('./commands/groupControl');
     horariosHandler = require('./commands/horarios');
@@ -527,7 +527,7 @@ client.on('message_create', async (message) => {
     // VERIFICAÇÃO DE SEGURANÇA CENTRALIZADA
     const adminOnlyCommands = [
         'all', 'allg', 'allg2', 'ban', 'banextremo', 'banlinkgp', 'antilinkgp', 'antilink', 
-        'banfoto', 'bangringo', 'addads', 'rmads', 'listads', 'bv', 'legendabv', 
+                    'banfoto', 'bangringo', 'addads', 'rmads', 'listads', 'statusads', 'bv', 'legendabv', 
         'abrirgrupo', 'fechargrupo', 'abrirgp', 'fechargp', 'afgp', 'soadm', 'syncstatus',
         'horapg', 'addhorapg', 'imagem-horarios', 'sorteio', 'updatebot', 'atualizar',
         'apagar', 'autoresposta'
@@ -1058,6 +1058,7 @@ client.on('message_create', async (message) => {
             case 'addads':
             case 'listads':
             case 'rmads':
+            case 'statusads':
                 await adsHandler.handle(client, message, command, args);
                 break;
 

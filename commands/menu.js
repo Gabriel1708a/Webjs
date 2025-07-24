@@ -20,6 +20,7 @@ class MenuHandler {
 🗞️ *ANÚNCIOS:*
 📢 !addads mensagem|intervalo – Criar anúncio
 📋 !listads – Listar anúncios
+📊 !statusads – Status dos anúncios
 🗑️ !rmads ID – Remover anúncio
 
 👋 *BOAS-VINDAS:*
