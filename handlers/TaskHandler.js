@@ -8,7 +8,7 @@ class TaskHandler {
     }
 
     start() {
-        console.log('[TAREFAS] Iniciando o verificador de tarefas do painel...');
+        console.log('[TAREFAS] Iniciando o verificador de tarefas do painel (rota /api/tasks)...');
         this.fetchAndProcessTasks(); 
         this.intervalId = setInterval(() => this.fetchAndProcessTasks(), 60 * 1000);
     }
@@ -20,10 +20,15 @@ class TaskHandler {
 
     async fetchAndProcessTasks() {
         try {
-            const response = await axios.get(`${config.laravelApi.baseUrl}/tasks/pending`, {
+            const response = await axios.get(`${config.laravelApi.baseUrl}/tasks`, {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
             });
-            const tasks = response.data.tasks;
+            // Suportar diferentes formatos de resposta
+            let tasks = response.data.tasks || response.data.data || response.data;
+            if (!Array.isArray(tasks)) {
+                tasks = [];
+            }
+            
             if (tasks && tasks.length > 0) {
                 console.log(`[TAREFAS] ${tasks.length} nova(s) tarefa(s) encontrada(s).`);
                 for (const task of tasks) {
