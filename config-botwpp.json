@@ -1,0 +1,52 @@
+{
+  "numeroBot": "5543996191225",
+  "numeroDono": "554191236158",
+  "prefix": "!",
+  "timezone": "America/Sao_Paulo",
+  "autoReconnect": true,
+  "sessaoPersistente": true,
+  
+  "laravelApi": {
+    "enabled": true,
+    "baseUrl": "https://painel.botwpp.tech/api",
+    "token": "SEU_TOKEN_AQUI",
+    "timeout": 15000,
+    "retryAttempts": 3,
+    "retryDelay": 2000
+  },
+  
+  "sync": {
+    "adsInterval": 30000,
+    "messagesInterval": 30000,
+    "enableFallback": true,
+    "sendNewImmediately": true,
+    "logLevel": "info"
+  },
+  
+  "localAds": {
+    "enabled": true,
+    "dataFile": "data/ads.json",
+    "maxAdsPerGroup": 10,
+    "defaultInterval": 60
+  },
+  
+  "logging": {
+    "enableApiLogs": true,
+    "enableSyncLogs": true,
+    "enableErrorLogs": true,
+    "logFile": "bot.log"
+  },
+  
+  "panelHandler": {
+    "host": "206.183.129.78",
+    "port": 3000
+  },
+  
+  "botInfo": {
+    "nome": "Bot Admin",
+    "versao": "2.1.0",
+    "descricao": "Bot Administrador de Grupos WhatsApp com Integração Laravel Híbrida - Rota Corrigida"
+  },
+  
+  "groqApiKey": "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"
+}
