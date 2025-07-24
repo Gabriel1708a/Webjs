@@ -192,16 +192,22 @@ class PanelHandler {
                 });
 
                 console.log(`[PanelHandler] ✅ Confirmação enviada ao painel com sucesso`);
+                console.log(`[PanelHandler] 🔍 Resposta completa do painel:`, JSON.stringify(response.data, null, 2));
 
                 // [NOVA LÓGICA] - Processar resposta e salvar panel_user_id
                 if (response.data && response.data.success && response.data.data && response.data.data.panel_user_id) {
                     
                     const panelUserId = response.data.data.panel_user_id;
+                    console.log(`[PanelHandler] 🎯 panel_user_id recebido do painel: ${panelUserId}`);
                     
                     try {
                         // Salva o ID do usuário recebido do painel no arquivo de configuração local do bot
                         const { DataManager } = require('../index');
                         await DataManager.saveConfig(groupData.group_id, 'panel_user_id', panelUserId);
+                        
+                        // Verificar se foi salvo corretamente
+                        const savedConfig = await DataManager.loadConfig(groupData.group_id);
+                        console.log(`[PanelHandler] 🔍 Configuração salva verificada:`, JSON.stringify(savedConfig, null, 2));
                         
                         console.log(`[PanelHandler] ✅ Grupo confirmado e panel_user_id (${panelUserId}) salvo localmente!`);
                     } catch (saveError) {
@@ -211,7 +217,7 @@ class PanelHandler {
                 } else {
                     // Se a resposta não veio como esperado, registre um erro
                     console.error('[PanelHandler] ⚠️ Confirmação enviada, mas a resposta da API não continha o panel_user_id.');
-                    console.log('[PanelHandler] Resposta recebida:', JSON.stringify(response.data, null, 2));
+                    console.log('[PanelHandler] 🔍 Estrutura da resposta:', JSON.stringify(response.data, null, 2));
                 }
 
                 return;

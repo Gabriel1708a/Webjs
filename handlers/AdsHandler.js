@@ -399,10 +399,15 @@ class AdsHandler {
         try {
             // Obter panel_user_id das configurações do grupo
             const groupConfig = await DataManager.loadConfig(groupId);
+            console.log(`[ADS-SYNC] 🔍 Configuração do grupo ${groupId}:`, JSON.stringify(groupConfig, null, 2));
+            
             if (!groupConfig || !groupConfig.panel_user_id) {
-                console.warn(`[ADS-SYNC] panel_user_id não encontrado para grupo ${groupId}. Sincronização ignorada.`);
+                console.warn(`[ADS-SYNC] ❌ panel_user_id não encontrado para grupo ${groupId}. Sincronização ignorada.`);
+                console.warn(`[ADS-SYNC] 💡 Dica: Certifique-se de que o grupo foi confirmado via painel primeiro.`);
                 return { success: false, error: 'panel_user_id não encontrado' };
             }
+            
+            console.log(`[ADS-SYNC] ✅ panel_user_id encontrado: ${groupConfig.panel_user_id}`);
 
             const apiUrl = config.laravelApi?.baseUrl || 'https://painel.botwpp.tech/api';
             const apiToken = config.laravelApi?.token || 'teste';
@@ -414,6 +419,7 @@ class AdsHandler {
                     url = `${apiUrl}/ads`;
                     method = 'POST';
                     data = {
+                        user_id: groupConfig.panel_user_id, // [CORREÇÃO CRÍTICA] - Incluir user_id do painel
                         group_id: groupId,
                         content: adData.mensagem,
                         interval: adData.intervalo,

@@ -21,6 +21,7 @@ class MenuHandler {
 📢 !addads mensagem|intervalo – Criar anúncio
 📋 !listads – Listar anúncios
 📊 !statusads – Status dos anúncios
+🔍 !checkpanel – Verificar config do painel
 🗑️ !rmads ID – Remover anúncio
 
 👋 *BOAS-VINDAS:*

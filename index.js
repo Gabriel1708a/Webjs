@@ -1062,6 +1062,11 @@ client.on('message_create', async (message) => {
                 await adsHandler.handle(client, message, command, args);
                 break;
 
+            case 'checkpanel':
+                const debugHandler = require('./commands/debug');
+                await debugHandler.handle(client, message, command, args);
+                break;
+
             case 'bv':
             case 'legendabv':
                 await welcomeHandler.handle(client, message, command, args);
