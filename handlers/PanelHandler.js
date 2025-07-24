@@ -2,7 +2,7 @@
 
 const express = require('express');
 const axios = require('axios');
-const Sender = require('../Sender');
+const Sender = require('../utils/Sender');
 
 class PanelHandler {
     static client;

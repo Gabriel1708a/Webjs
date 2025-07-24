@@ -6,7 +6,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 // Ajuste os caminhos para apontar para os arquivos corretos a partir da pasta 'commands'
 // O '../' sobe um nível de diretório.
 const { Utils } = require('../utils/Utils'); // Supondo que Utils.js esteja em utils/
-const Sender = require('../Sender'); // Supondo que Sender.js esteja na raiz
+const Sender = require('../utils/Sender'); // Sender.js está em utils/
 
 // --- CONFIGURAÇÃO CENTRALIZADA ---
 const config = {

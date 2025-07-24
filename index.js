@@ -42,7 +42,7 @@ let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupCo
 const AutoMessageHandler = require('./handlers/AutoMessageHandler');
 
 // Importar módulo de envio centralizado
-const Sender = require('./Sender');
+const Sender = require('./utils/Sender');
 
 // Importar handler do painel para entrada em grupos
 const PanelHandler = require('./handlers/PanelHandler');
