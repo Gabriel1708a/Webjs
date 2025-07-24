@@ -22,6 +22,7 @@ class MenuHandler {
 📋 !listads – Listar anúncios
 📊 !statusads – Status dos anúncios
 🔍 !checkpanel – Verificar config do painel
+🔧 !fixpanel – Corrigir config do painel
 🗑️ !rmads ID – Remover anúncio
 
 👋 *BOAS-VINDAS:*

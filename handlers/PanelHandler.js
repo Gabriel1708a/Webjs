@@ -194,10 +194,26 @@ class PanelHandler {
                 console.log(`[PanelHandler] ✅ Confirmação enviada ao painel com sucesso`);
                 console.log(`[PanelHandler] 🔍 Resposta completa do painel:`, JSON.stringify(response.data, null, 2));
 
-                // [NOVA LÓGICA] - Processar resposta e salvar panel_user_id
-                if (response.data && response.data.success && response.data.data && response.data.data.panel_user_id) {
-                    
-                    const panelUserId = response.data.data.panel_user_id;
+                // [NOVA LÓGICA MELHORADA] - Processar resposta e salvar panel_user_id
+                let panelUserId = null;
+                
+                // Tentar diferentes estruturas de resposta
+                if (response.data) {
+                    // Formato 1: response.data.data.panel_user_id
+                    if (response.data.data && response.data.data.panel_user_id) {
+                        panelUserId = response.data.data.panel_user_id;
+                    }
+                    // Formato 2: response.data.panel_user_id
+                    else if (response.data.panel_user_id) {
+                        panelUserId = response.data.panel_user_id;
+                    }
+                    // Formato 3: response.data.user_id (caso o Laravel retorne assim)
+                    else if (response.data.user_id) {
+                        panelUserId = response.data.user_id;
+                    }
+                }
+                
+                if (panelUserId) {
                     console.log(`[PanelHandler] 🎯 panel_user_id recebido do painel: ${panelUserId}`);
                     
                     try {
@@ -217,6 +233,7 @@ class PanelHandler {
                 } else {
                     // Se a resposta não veio como esperado, registre um erro
                     console.error('[PanelHandler] ⚠️ Confirmação enviada, mas a resposta da API não continha o panel_user_id.');
+                    console.error('[PanelHandler] 🔍 Formatos testados: data.panel_user_id, data.data.panel_user_id, data.user_id');
                     console.log('[PanelHandler] 🔍 Estrutura da resposta:', JSON.stringify(response.data, null, 2));
                 }
 

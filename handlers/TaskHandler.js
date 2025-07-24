@@ -8,7 +8,7 @@ class TaskHandler {
     }
 
     start() {
-        console.log('[TAREFAS] Iniciando o verificador de tarefas do painel (rota /api/bot/tasks)...');
+        console.log('[TAREFAS] Iniciando o verificador de tarefas do painel (rota /api/tasks)...');
         this.fetchAndProcessTasks(); 
         this.intervalId = setInterval(() => this.fetchAndProcessTasks(), 60 * 1000);
     }
@@ -20,7 +20,7 @@ class TaskHandler {
 
     async fetchAndProcessTasks() {
         try {
-            const response = await axios.get(`${config.laravelApi.baseUrl}/bot/tasks`, {
+            const response = await axios.get(`${config.laravelApi.baseUrl}/tasks`, {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
             });
             // Suportar diferentes formatos de resposta
@@ -84,7 +84,7 @@ class TaskHandler {
     async updateTaskStatus(taskId, status, result = {}) {
         try {
             const response = await axios.post(
-                `${config.laravelApi.baseUrl}/bot/tasks/update`, 
+                `${config.laravelApi.baseUrl}/tasks/update`, 
                 { task_id: taskId, status: status, result: result },
                 { headers: { 'Authorization': `Bearer ${config.laravelApi.token}` } }
             );

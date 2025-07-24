@@ -1063,6 +1063,7 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'checkpanel':
+            case 'fixpanel':
                 const debugHandler = require('./commands/debug');
                 await debugHandler.handle(client, message, command, args);
                 break;
