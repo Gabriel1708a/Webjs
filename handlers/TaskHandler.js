@@ -8,7 +8,7 @@ class TaskHandler {
     }
 
     start() {
-        console.log('[TAREFAS] Iniciando o verificador de tarefas do painel (rota /api/tasks)...');
+        console.log('[TAREFAS] Iniciando o verificador de tarefas do painel (rota /api/bot/tasks)...');
         this.fetchAndProcessTasks(); 
         this.intervalId = setInterval(() => this.fetchAndProcessTasks(), 60 * 1000);
     }
@@ -84,7 +84,7 @@ class TaskHandler {
     async updateTaskStatus(taskId, status, result = {}) {
         try {
             const response = await axios.post(
-                `${config.laravelApi.baseUrl}/tasks/update`, 
+                `${config.laravelApi.baseUrl}/bot/tasks/update`, 
                 { task_id: taskId, status: status, result: result },
                 { headers: { 'Authorization': `Bearer ${config.laravelApi.token}` } }
             );
