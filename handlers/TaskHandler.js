@@ -20,7 +20,7 @@ class TaskHandler {
 
     async fetchAndProcessTasks() {
         try {
-            const response = await axios.get(`${config.laravelApi.baseUrl}/tasks`, {
+            const response = await axios.get(`${config.laravelApi.baseUrl}/bot/tasks`, {
                 headers: { 'Authorization': `Bearer ${config.laravelApi.token}` }
             });
             // Suportar diferentes formatos de resposta
