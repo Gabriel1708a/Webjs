@@ -12,7 +12,7 @@ class AutoMessageHandler {
      * @param {object} dataManager - Instância do DataManager para acessar dados locais
      */
     static async initialize(dataManager = null) {
-        console.log('🔄 Iniciando serviço de mensagens automáticas híbrido...');
+        console.log('🔄 Iniciando serviço de mensagens automáticas híbrido v2.1 (rotas corrigidas)...');
         
         // Armazenar DataManager para uso posterior
         this.DataManager = dataManager;
@@ -42,8 +42,8 @@ class AutoMessageHandler {
         let panelError = false;
 
         try {
-            console.log('📡 Buscando mensagens do painel Laravel...');
-            const response = await axios.get(`${config.laravelApi.baseUrl}/messages/pending`, {
+            console.log('📡 Buscando mensagens do painel Laravel (nova rota /api/ads)...');
+            const response = await axios.get(`${config.laravelApi.baseUrl}/ads`, {
                 headers: {
                     'Authorization': `Bearer ${config.laravelApi.token}`,
                     'Accept': 'application/json'
@@ -54,15 +54,16 @@ class AutoMessageHandler {
             // [CORREÇÃO] Verificar o formato da resposta do Laravel
             let messages = response.data;
             
-            // Se a resposta tem um wrapper 'data', extrair o array
+            // Se a resposta tem um wrapper, extrair o array
             if (messages && typeof messages === 'object' && !Array.isArray(messages)) {
                 if (messages.data && Array.isArray(messages.data)) {
                     messages = messages.data;
                 } else if (messages.messages && Array.isArray(messages.messages)) {
                     messages = messages.messages;
+                } else if (messages.ads && Array.isArray(messages.ads)) {
+                    messages = messages.ads;
                 } else {
-                    console.warn('⚠️ Formato de resposta inesperado do painel:', messages);
-                    console.warn('⚠️ Esperado: array ou objeto com propriedade data/messages');
+                    console.warn('⚠️ Formato de resposta inesperado do painel:', Object.keys(messages));
                     panelError = true;
                 }
             }
@@ -254,7 +255,7 @@ class AutoMessageHandler {
      */
     static async markAsSentInPanel(messageId) {
         try {
-            await axios.post(`${config.laravelApi.baseUrl}/messages/${messageId}/sent`, {}, {
+            await axios.post(`${config.laravelApi.baseUrl}/ads/${messageId}/sent`, {}, {
                 headers: {
                     'Authorization': `Bearer ${config.laravelApi.token}`
                 }
