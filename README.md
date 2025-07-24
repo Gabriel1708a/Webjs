@@ -1,243 +1,343 @@
-# 🤖 Bot Administrador de Grupos WhatsApp
+# 🤖 Bot WhatsApp Admin - Sistema Híbrido Laravel
 
-Bot completo para administração de grupos WhatsApp com sistema de aluguel, desenvolvido com whatsapp-web.js.
+[![Node.js](https://img.shields.io/badge/Node.js-v18+-green)](https://nodejs.org/)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-Web.js-25D366)](https://github.com/pedroslopez/whatsapp-web.js)
+[![Laravel](https://img.shields.io/badge/Laravel-Integration-FF2D20)](https://laravel.com/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## ✨ Funcionalidades
+Bot administrador de grupos WhatsApp com **sistema híbrido** de integração Laravel, oferecendo sincronização bidirecional e fallback local automático.
 
-### 🎯 **Comandos Gerais**
-- `!menu` - Lista todos os comandos disponíveis
-- `!all` - Menciona todos os membros silenciosamente
-- `!vergrupo` - Verifica status e validade do grupo
+## 🚀 **Funcionalidades Principais**
 
-### 🗞️ **Sistema de Anúncios Automáticos**
-- `!addads mensagem|intervalo` - Criar anúncio automático
-- `!listads` - Listar anúncios ativos
-- `!rmads ID` - Remover anúncio por ID
+### 📢 **Sistema de Anúncios Híbrido**
+- ✅ **Integração Laravel:** Sincronização automática com painel web
+- ✅ **Fallback Local:** Sistema local quando painel indisponível  
+- ✅ **Mídia Suportada:** Imagens, vídeos e texto
+- ✅ **Indicadores Visuais:** ☁️ Painel | 💾 Local
+- ✅ **Sincronização Bidirecional:** Criação/remoção automática
 
-### 👋 **Boas-Vindas Personalizadas**
-- `!bv 1/0` - Ativar/desativar boas-vindas
-- `!legendabv texto` - Definir mensagem personalizada
-- Suporte a `@user` (novo membro) e `@group` (nome do grupo)
-
-### 🔐 **Controle de Grupo**
-- `!abrirgrupo` / `!fechargrupo` - Controle manual
-- `!abrirgp HH:MM` / `!fechargp HH:MM` - Agendamento automático
-- `!afgp 0` - Cancelar agendamentos
-
-### 🎉 **Sorteios por Reação**
-- `!sorteio prêmio|tempo` - Criar sorteio interativo
-- Participação via reação ✅
-- Sorteio automático ao final do tempo
-
-### 🎰 **Horários Pagantes**
-- `!horarios` - Enviar dicas de apostas
-- `!horapg 1/0` - Ativar/desativar sistema
-- `!addhorapg 30m` - Agendar próximos horários
-
-### 🛡️ **Sistema Anti-Link**
-- `!banextremo` - Ban por qualquer link
-- `!banlinkgp` - Ban por link de grupo WhatsApp
-- `!antilinkgp` - Apenas apagar links de grupo
-- `!antilink` - Apenas apagar qualquer link
-- `!ban` - Banir usuário (responder mensagem)
-
-### 👑 **Administração**
-- `!liberargrupo X` - Liberar grupo por X dias
-- Sistema de aluguel automático
-- Verificação de validade por grupo
-
-## 🚀 Instalação
-
-### 1. **Pré-requisitos**
+### 🎯 **Comandos de Anúncios**
 ```bash
-# Node.js 16+ e npm
-node --version
-npm --version
+!addads mensagem|intervalo    # Criar anúncio (suporte a mídia)
+!listads                      # Listar todos os anúncios
+!rmads ID                     # Remover anúncio específico
+!statusads                    # Status completo do sistema
 ```
 
-### 2. **Clonar e Instalar**
+### 🔧 **Administração de Grupos**
+- ✅ Controle de membros (ban/unban)
+- ✅ Configurações de grupo (abrir/fechar)
+- ✅ Sistema de boas-vindas personalizado
+- ✅ Anti-link e anti-spam
+- ✅ Sorteios automáticos
+- ✅ Horários programados
+- ✅ Auto-respostas inteligentes
+
+### 🌐 **Integração Laravel**
+- ✅ **API REST:** Comunicação com painel web
+- ✅ **Token Seguro:** Autenticação Bearer
+- ✅ **Retry Logic:** Tentativas automáticas
+- ✅ **Health Check:** Monitoramento de conexão
+- ✅ **Task Handler:** Processamento de tarefas
+
+## 📦 **Instalação Rápida**
+
+### 1. **Clone o Repositório**
 ```bash
-git clone <seu-repositorio>
-cd whatsapp-bot-admin
+git clone https://github.com/seu-usuario/bot-whatsapp-admin.git
+cd bot-whatsapp-admin
+```
+
+### 2. **Instale as Dependências**
+```bash
 npm install
 ```
 
-### 3. **Configuração**
+### 3. **Configure o Bot**
 Edite o arquivo `config.json`:
+
 ```json
 {
-  "numeroBot": "5511999999999",      // Número do bot (com código do país)
-  "numeroDono": "5511888888888",     // Número do administrador
-  "prefix": "!",
-  "timezone": "America/Sao_Paulo"
-}
-```
-
-### 4. **Primeira Execução**
-```bash
-npm start
-```
-
-### 5. **Pareamento**
-- O bot gerará um código de 8 dígitos automaticamente
-- Código será enviado para o número do dono via WhatsApp
-- Insira o código no WhatsApp para conectar
-
-## 📱 Como Usar
-
-### **Conectar o Bot**
-1. Execute `npm start`
-2. Aguarde o código de pareamento ser enviado
-3. Abra WhatsApp > Configurações > Aparelhos conectados
-4. Clique em "Conectar um aparelho"
-5. Insira o código de 8 dígitos
-
-### **Liberar um Grupo**
-```
-!liberargrupo 30
-```
-Libera o grupo atual por 30 dias.
-
-### **Configurar Boas-Vindas**
-```
-!bv 1
-!legendabv Bem-vindo @user ao grupo @group! 🎉
-```
-
-### **Criar Anúncio Automático**
-```
-!addads Visite nosso site: exemplo.com|60
-```
-Envia o anúncio a cada 60 minutos.
-
-### **Agendar Abertura/Fechamento**
-```
-!abrirgp 09:00
-!fechargp 18:00
-```
-
-### **Criar Sorteio**
-```
-!sorteio Pix R$100|2m
-```
-Sorteio de R$100 por 2 minutos.
-
-## 🔧 Estrutura do Projeto
-
-```
-├── index.js              # Arquivo principal
-├── config.json           # Configurações
-├── package.json           # Dependências
-├── commands/              # Módulos de comandos
-│   ├── menu.js
-│   ├── welcome.js
-│   ├── ban.js
-│   ├── sorteio.js
-│   ├── ads.js
-│   ├── groupControl.js
-│   └── horarios.js
-└── data/                  # Dados JSON
-    ├── grupoAluguel.json  # Controle de aluguel
-    ├── configs.json       # Configurações por grupo
-    ├── ads.json           # Anúncios automáticos
-    ├── sorteios.json      # Histórico de sorteios
-    └── horarios.json      # Horários pagantes
-```
-
-## 🌐 Integração Laravel (Futuro)
-
-O bot está preparado para integração com API Laravel:
-
-```javascript
-// Exemplo de configuração futura
-"laravelApi": {
-  "enabled": true,
-  "baseUrl": "https://seu-site.com/api",
-  "token": "seu-token-api"
-}
-```
-
-### **Endpoints Planejados:**
-- `GET /grupos/{id}/status` - Status do grupo
-- `POST /grupos/{id}/config` - Salvar configurações
-- `GET /grupos/{id}/sorteios` - Histórico de sorteios
-- `POST /anuncios` - Criar anúncios via painel
-
-## 🛠️ Manutenção
-
-### **Logs**
-O bot exibe logs em tempo real no console:
-```
-🤖 Bot conectado e pronto!
-📱 Número: 5511999999999
-📋 Nome: Bot Admin
-📢 Anúncios automáticos carregados
-⏰ Agendamentos de grupo carregados
-🎰 Horários automáticos carregados
-```
-
-### **Backup dos Dados**
-Faça backup regular da pasta `data/`:
-```bash
-cp -r data/ backup-$(date +%Y%m%d)/
-```
-
-### **Atualização**
-```bash
-git pull origin main
-npm install
-npm start
-```
-
-## 🔒 Sistema de Aluguel
-
-### **Como Funciona**
-- Cada grupo tem uma validade definida
-- Bot só funciona em grupos ativos
-- Mensagem automática para grupos vencidos
-- Controle via arquivo `grupoAluguel.json`
-
-### **Estrutura de Dados**
-```json
-{
-  "grupos": {
-    "5511999999999-1234567890@g.us": {
-      "activated": "2024-01-15T10:30:00-03:00",
-      "expiry": "2024-02-14T10:30:00-03:00",
-      "days": 30
-    }
+  "laravelApi": {
+    "baseUrl": "https://painel.botwpp.tech/api",
+    "token": "seu-token-aqui",
+    "timeout": 10000
+  },
+  "sync": {
+    "enableFallback": true,
+    "sendNewImmediately": true
+  },
+  "localAds": {
+    "enabled": true
   }
 }
 ```
 
-## 💡 Dicas de Uso
+### 4. **Inicie o Bot**
+```bash
+npm start
+```
 
-1. **Sempre teste em grupo pequeno primeiro**
-2. **Configure boas-vindas antes de ativar**
-3. **Use horários automáticos com moderação**
-4. **Monitore logs para detectar erros**
-5. **Faça backup dos dados regularmente**
+## 🎮 **Guia de Uso**
 
-## 🆘 Solução de Problemas
+### **Criando Anúncios**
 
-### **Bot não conecta**
-- Verifique se o número no `config.json` está correto
-- Certifique-se que o WhatsApp não está aberto no celular
-- Delete a pasta `.wwebjs_auth` e tente novamente
+#### **Anúncio de Texto:**
+```
+!addads Visite nosso site: exemplo.com|60
+```
 
-### **Comandos não funcionam**
-- Verifique se o grupo está liberado (`!vergrupo`)
-- Confirme se você é administrador do grupo
-- Verifique se o bot é administrador do grupo
+#### **Anúncio com Mídia:**
+1. Envie uma imagem/vídeo
+2. Na legenda digite: `!addads Promoção especial!|30`
 
-### **Erro de permissão**
-- Bot precisa ser administrador para banir/controlar grupo
-- Verifique configurações de privacidade do grupo
+#### **Resposta com Mídia:**
+1. Responda uma mídia existente
+2. Digite: `!addads Oferta limitada!|45`
 
-## 📄 Licença
+### **Gerenciando Anúncios**
 
-MIT License - Livre para uso e modificação.
+#### **Listar Anúncios:**
+```
+!listads
+```
+**Saída exemplo:**
+```
+📢 ANÚNCIOS DO GRUPO:
+
+✅ ATIVOS (2):
+
+🆔 ID: panel_123
+⏰ Intervalo: 60 min
+📝 Tipo: texto
+☁️ Origem: painel
+📝 Mensagem: Visite nosso site...
+━━━━━━━━━━━━━━━━━━
+
+🆔 ID: local_456
+⏰ Intervalo: 30 min
+📷 Tipo: midia
+💾 Origem: local
+📝 Mensagem: Promoção especial...
+━━━━━━━━━━━━━━━━━━
+
+📊 Total: 2 anúncios
+☁️ Painel | 💾 Local
+```
+
+#### **Status do Sistema:**
+```
+!statusads
+```
+**Saída exemplo:**
+```
+📊 STATUS DOS ANÚNCIOS
+
+🏢 Painel: 5 anúncios
+💾 Local: 3 anúncios
+⏰ Timers ativos: 8
+🔗 Conexão: ✅ Online
+
+🔄 Última verificação: 14:30:25
+```
+
+#### **Remover Anúncios:**
+```
+!rmads panel_123    # Remove do painel
+!rmads local_456    # Remove local
+!rmads 789          # Compatibilidade (local)
+```
+
+## 🔧 **Configuração Avançada**
+
+### **Arquivo config.json Completo:**
+```json
+{
+  "numeroBot": "5543996191225",
+  "numeroDono": "554191236158",
+  "prefix": "!",
+  "timezone": "America/Sao_Paulo",
+  "autoReconnect": true,
+  "sessaoPersistente": true,
+  
+  "laravelApi": {
+    "enabled": true,
+    "baseUrl": "https://painel.botwpp.tech/api",
+    "token": "teste",
+    "timeout": 10000,
+    "retryAttempts": 3,
+    "retryDelay": 2000
+  },
+  
+  "sync": {
+    "adsInterval": 30000,
+    "messagesInterval": 30000,
+    "enableFallback": true,
+    "sendNewImmediately": true,
+    "logLevel": "info"
+  },
+  
+  "localAds": {
+    "enabled": true,
+    "dataFile": "data/ads.json",
+    "maxAdsPerGroup": 10,
+    "defaultInterval": 60
+  },
+  
+  "logging": {
+    "enableApiLogs": true,
+    "enableSyncLogs": true,
+    "enableErrorLogs": true,
+    "logFile": "bot.log"
+  },
+  
+  "botInfo": {
+    "nome": "Bot Admin",
+    "versao": "2.0.0",
+    "descricao": "Bot Administrador de Grupos WhatsApp com Integração Laravel Híbrida"
+  }
+}
+```
+
+### **Estrutura de Arquivos:**
+```
+bot-whatsapp-admin/
+├── handlers/
+│   ├── AdsHandler.js          # Sistema híbrido de anúncios
+│   ├── AutoMessageHandler.js  # Mensagens automáticas
+│   ├── SyncHandler.js         # Sincronização com Laravel
+│   ├── PanelHandler.js        # Handler do painel
+│   └── TaskHandler.js         # Processamento de tarefas
+├── utils/
+│   └── Sender.js              # Módulo de envio centralizado
+├── commands/
+│   ├── menu.js                # Sistema de menus
+│   ├── welcome.js             # Boas-vindas
+│   ├── ban.js                 # Sistema de banimento
+│   └── ...                    # Outros comandos
+├── data/
+│   ├── ads.json               # Anúncios locais (fallback)
+│   ├── configs.json           # Configurações de grupos
+│   └── ...                    # Outros dados
+├── config.json                # Configuração principal
+├── index.js                   # Arquivo principal
+└── package.json               # Dependências
+```
+
+## 🔄 **Sistema Híbrido**
+
+### **Como Funciona:**
+1. **Prioridade:** Sempre busca anúncios do painel Laravel primeiro
+2. **Fallback:** Se painel indisponível, usa anúncios locais automaticamente
+3. **Sincronização:** Novos anúncios locais são enviados para o painel
+4. **Indicadores:** Interface mostra origem de cada anúncio
+5. **Recuperação:** Quando painel volta, para anúncios locais e usa painel
+
+### **Vantagens:**
+- ✅ **Alta Disponibilidade:** Nunca para de funcionar
+- ✅ **Sincronização Inteligente:** Dados sempre atualizados
+- ✅ **Interface Unificada:** Gerencia tudo em um lugar
+- ✅ **Recuperação Automática:** Volta ao painel quando disponível
+
+## 📊 **Monitoramento**
+
+### **Logs do Sistema:**
+```bash
+# Logs de API
+[API] 📡 Buscando mensagens do painel Laravel...
+[API] ✅ 5 mensagens do painel encontradas
+
+# Logs de Sincronização  
+[SYNC] Iniciando sincronização. Mensagens ativas: 3, Painel: 5
+[SYNC] Nova mensagem detectada ID: 123. Agendando...
+
+# Logs de Anúncios
+[ADS-SYNC] ✅ Anúncio ID 456 sincronizado (create) com banco de dados
+[ADS-SYNC] ❌ Erro ao sincronizar anúncio ID 789 (delete). Status: 404
+```
+
+### **Status em Tempo Real:**
+```bash
+[STATUS] Painel: ✅ | Mensagens painel: 5 | Anúncios locais: 2
+```
+
+## 🛠️ **Solução de Problemas**
+
+### **Painel Laravel Indisponível:**
+- ✅ Sistema continua funcionando com anúncios locais
+- ✅ Sincronização automática quando painel voltar
+- ✅ Logs mostram status da conexão
+
+### **Anúncios Não Enviando:**
+1. Verifique `!statusads` 
+2. Confirme se timers estão ativos
+3. Verifique logs de erro
+4. Teste conectividade com painel
+
+### **Problemas de Sincronização:**
+1. Verifique token da API
+2. Confirme URL do painel
+3. Teste timeout da rede
+4. Verifique logs de sincronização
+
+## 🚀 **Scripts Úteis**
+
+### **Desenvolvimento:**
+```bash
+npm run dev          # Modo desenvolvimento
+npm run test         # Testes automatizados
+npm run logs         # Ver logs em tempo real
+```
+
+### **Produção:**
+```bash
+npm start            # Iniciar bot
+npm run restart      # Reiniciar bot
+npm run status       # Status do sistema
+```
+
+## 📝 **Comandos Completos**
+
+### **Anúncios:**
+- `!addads texto|minutos` - Criar anúncio
+- `!listads` - Listar anúncios
+- `!rmads ID` - Remover anúncio
+- `!statusads` - Status do sistema
+
+### **Administração:**
+- `!all texto` - Mencionar todos
+- `!ban @usuario` - Banir membro
+- `!unban @usuario` - Desbanir membro
+- `!abrirgp` - Abrir grupo
+- `!fechargp` - Fechar grupo
+
+### **Utilitários:**
+- `!menu` - Menu principal
+- `!ping` - Testar bot
+- `!status` - Status geral
+- `!help` - Ajuda completa
+
+## 🤝 **Contribuição**
+
+1. Fork o projeto
+2. Crie uma branch: `git checkout -b feature/nova-funcionalidade`
+3. Commit suas mudanças: `git commit -m 'Adiciona nova funcionalidade'`
+4. Push para a branch: `git push origin feature/nova-funcionalidade`
+5. Abra um Pull Request
+
+## 📄 **Licença**
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+
+## 🆘 **Suporte**
+
+- 📧 **Email:** suporte@exemplo.com
+- 💬 **WhatsApp:** +55 41 99999-9999
+- 🐛 **Issues:** [GitHub Issues](https://github.com/seu-usuario/bot-whatsapp-admin/issues)
+- 📖 **Documentação:** [Wiki do Projeto](https://github.com/seu-usuario/bot-whatsapp-admin/wiki)
 
 ---
 
-**🤖 Bot Admin v1.0** - Desenvolvido para facilitar a administração de grupos WhatsApp
+**Desenvolvido com ❤️ para a comunidade WhatsApp**
+
+> ⭐ Se este projeto te ajudou, deixe uma estrela no GitHub!

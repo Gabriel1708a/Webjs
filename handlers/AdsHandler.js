@@ -1,6 +1,6 @@
 const { DataManager, Utils } = require('../index');
 const axios = require('axios');
-const config = require('../config/config.json');
+const config = require('../config.json');
 
 class AdsHandler {
     static intervals = new Map(); // Armazenar intervalos ativos

@@ -1,6 +1,6 @@
 const axios = require('axios');
 const Sender = require('../utils/Sender');
-const config = require('../config/config.json'); // Usar config centralizado
+const config = require('../config.json'); // Usar config centralizado
 
 class AutoMessageHandler {
     static activeMessages = new Map(); // Armazena as mensagens e seus timers
@@ -27,7 +27,7 @@ class AutoMessageHandler {
         this.sendLocalAd = this.sendLocalAd.bind(this);
 
         // Iniciar busca híbrida com intervalo otimizado
-        setInterval(this.fetchMessagesFromPanel, 30 * 1000); // 30s em vez de 10s
+        setInterval(this.fetchMessagesFromPanel, config.sync.messagesInterval);
         
         this.fetchMessagesFromPanel();
     }
@@ -48,7 +48,7 @@ class AutoMessageHandler {
                     'Authorization': `Bearer ${config.laravelApi.token}`,
                     'Accept': 'application/json'
                 },
-                timeout: 5000
+                timeout: config.laravelApi.timeout
             });
 
             // [CORREÇÃO] Verificar o formato da resposta do Laravel
@@ -84,7 +84,7 @@ class AutoMessageHandler {
         // [SISTEMA HÍBRIDO] Se painel falhou ou está vazio, usar anúncios locais
         if (panelError || panelMessages.length === 0) {
             // [OTIMIZAÇÃO] Só carregar anúncios locais se não estiverem já carregados
-            if (this.localAdsTimers.size === 0) {
+            if (this.localAdsTimers.size === 0 && config.localAds.enabled) {
                 console.log('🔄 Painel indisponível ou vazio. Carregando anúncios locais como fallback...');
                 await this.loadLocalAds();
             } else {
@@ -171,7 +171,7 @@ class AutoMessageHandler {
             return;
         }
 
-        if (isNew) {
+        if (isNew && config.sync?.sendNewImmediately) {
             console.log(`[DEBUG] É nova. Enviando imediatamente...`);
             this.sendMessage(messageData); 
         }
@@ -279,8 +279,10 @@ class AutoMessageHandler {
         }
 
         try {
-            console.log('📂 Carregando anúncios locais do ads.json...');
-            const adsData = await this.DataManager.loadData('ads.json');
+            if (config.logging?.enableSyncLogs) {
+                console.log('📂 Carregando anúncios locais do ads.json...');
+            }
+            const adsData = await this.DataManager.loadData(config.localAds?.dataFile || 'ads.json');
             
             if (!adsData.anuncios) {
                 console.log('📭 Nenhum anúncio local encontrado.');
