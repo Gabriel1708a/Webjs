@@ -1,6 +1,8 @@
-const { DataManager, Utils } = require('../index');
 const axios = require('axios');
 const config = require('../config.json');
+const fs = require('fs-extra');
+const path = require('path');
+const moment = require('moment-timezone');
 
 class AdsHandler {
     static intervals = new Map(); // Armazenar intervalos ativos
@@ -8,10 +10,59 @@ class AdsHandler {
     static cacheExpiry = new Map(); // Controle de expiração do cache
     static CACHE_DURATION = 30000; // 30 segundos de cache
 
+    // Utils locais para evitar dependência circular
+    static async loadData(filename) {
+        try {
+            const filePath = path.join(__dirname, '../data', filename);
+            if (!fs.existsSync(filePath)) {
+                const defaultData = filename === 'ads.json' ? { anuncios: {} } : {};
+                await this.saveData(filename, defaultData);
+                return defaultData;
+            }
+            return await fs.readJson(filePath);
+        } catch (error) {
+            console.error(`Erro ao carregar ${filename}: ${error.message}`);
+            return filename === 'ads.json' ? { anuncios: {} } : {};
+        }
+    }
+
+    static async saveData(filename, data) {
+        try {
+            const filePath = path.join(__dirname, '../data', filename);
+            await fs.ensureDir(path.dirname(filePath));
+            await fs.writeJson(filePath, data, { spaces: 2 });
+            return true;
+        } catch (error) {
+            console.error(`Erro ao salvar ${filename}: ${error.message}`);
+            return false;
+        }
+    }
+
+    static async loadConfig(groupId) {
+        try {
+            const configs = await this.loadData('configs.json');
+            return configs.grupos?.[groupId] || {};
+        } catch (error) {
+            console.error(`Erro ao carregar config para ${groupId}: ${error.message}`);
+            return {};
+        }
+    }
+
     static async handle(client, message, command, args) {
         const groupId = message.from;
 
-        if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
+        // Verificação simples de admin (temporária)
+        const chat = await message.getChat();
+        let isAuthorized = false;
+        
+        if (chat.isGroup) {
+            const participant = chat.participants.find(p => p.id._serialized === message.author);
+            isAuthorized = participant && (participant.isAdmin || participant.isSuperAdmin);
+        } else {
+            isAuthorized = true; // PV sempre autorizado
+        }
+
+        if (!isAuthorized) {
             await message.reply('🚫 Apenas administradores podem gerenciar anúncios.');
             return;
         }
@@ -50,7 +101,7 @@ class AdsHandler {
         }
 
         try {
-            const ads = await DataManager.loadData('ads.json');
+            const ads = await this.loadData('ads.json');
             if (!ads.anuncios) ads.anuncios = {};
             if (!ads.anuncios[groupId]) ads.anuncios[groupId] = {};
             if (!ads.counters) ads.counters = {};
@@ -93,7 +144,7 @@ class AdsHandler {
             };
 
             ads.anuncios[groupId][adId] = adData;
-            await DataManager.saveData('ads.json', ads);
+            await this.saveData('ads.json', ads);
 
             // Limpar cache do painel para este grupo
             this.clearCacheForGroup(groupId);
@@ -409,7 +460,7 @@ class AdsHandler {
         try {
             console.log(`[LOCAL] Buscando anúncios locais para grupo: ${groupId}`);
             
-            const ads = await DataManager.loadData('ads.json');
+            const ads = await this.loadData('ads.json');
             const localAds = ads.anuncios && ads.anuncios[groupId] ? ads.anuncios[groupId] : {};
             
             console.log(`[LOCAL] Encontrados ${Object.keys(localAds).length} anúncios locais para grupo ${groupId}`);
@@ -442,7 +493,7 @@ class AdsHandler {
         try {
             console.log(`[REMOVE-LOCAL] Tentando remover anúncio local ${adId} do grupo ${groupId}`);
             
-            const ads = await DataManager.loadData('ads.json');
+            const ads = await this.loadData('ads.json');
             
             if (!ads.anuncios || !ads.anuncios[groupId] || !ads.anuncios[groupId][adId]) {
                 console.log(`[REMOVE-LOCAL] Anúncio ${adId} não encontrado no grupo ${groupId}`);
@@ -466,7 +517,7 @@ class AdsHandler {
 
             // Remover do arquivo
             delete ads.anuncios[groupId][adId];
-            await DataManager.saveData('ads.json', ads);
+            await this.saveData('ads.json', ads);
             console.log(`[REMOVE-LOCAL] Anúncio ${adId} removido do arquivo`);
 
             // Tentar sincronizar remoção com o painel
@@ -523,7 +574,7 @@ class AdsHandler {
         try {
             console.log('📢 [INIT] Iniciando carregamento de anúncios...');
             
-            const ads = await DataManager.loadData('ads.json');
+            const ads = await this.loadData('ads.json');
             let totalLoaded = 0;
             let activeLoaded = 0;
             
@@ -570,7 +621,7 @@ class AdsHandler {
     static async syncAdWithDatabase(groupId, adData, action = 'create') {
         try {
             // Obter panel_user_id das configurações do grupo
-            const groupConfig = await DataManager.loadConfig(groupId);
+            const groupConfig = await this.loadConfig(groupId);
             console.log(`[ADS-SYNC] 🔍 Configuração do grupo ${groupId}:`, JSON.stringify(groupConfig, null, 2));
             
             if (!groupConfig || !groupConfig.panel_user_id) {

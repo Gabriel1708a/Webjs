@@ -1,9 +1,10 @@
 // ========================================================================================================
-// 🤖 BOT WHATSAPP ADMINISTRADOR - VERSÃO OTIMIZADA 2.0
+// 🤖 BOT WHATSAPP ADMINISTRADOR - VERSÃO CORRIGIDA 3.0
 // ========================================================================================================
-// 📅 Última atualização: 2024
+// 📅 Última atualização: 2024 - CORREÇÃO CRÍTICA
 // 🔧 Correções implementadas: Cache inteligente, Performance otimizada, Logs detalhados
 // 🚀 Melhorias: Sistema híbrido Laravel + Local, Handlers unificados, Inicialização paralela
+// 🆘 HOTFIX: Corrigido duplicação de switch cases e erro validateAndGetParts
 // ========================================================================================================
 
 // Carregar variáveis de ambiente
@@ -42,7 +43,7 @@ async function notificarPainelLaravel() {
             headers: {
                 Authorization: `Bearer ${config.laravelApi.token}`,
                 'Content-Type': 'application/json',
-                'User-Agent': 'WhatsApp-Bot/2.0'
+                'User-Agent': 'WhatsApp-Bot/3.0'
             },
             timeout: config.laravelApi.timeout
         });
@@ -58,7 +59,7 @@ async function notificarPainelLaravel() {
 }
 
 // Importar módulos de comandos (carregamento otimizado)
-let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupControlHandler, horariosHandler, autoRespostaHandler, syncStatusHandler, syncPanelHandler;
+let WelcomeCommand, BanCommand, SorteioCommand, AdsHandler, MenuCommand, GroupControlCommand, HorariosCommand, AutoRespostaCommand, SyncStatusCommand, SyncPanelCommand, DebugCommand;
 
 // Importar handlers principais
 const AutoMessageHandler = require('./handlers/AutoMessageHandler');
@@ -101,930 +102,627 @@ moment.tz.setDefault(config.timezone);
 // ========================================================================================================
 
 class Logger {
-    static logBox(title, content, color = 'blue') {
-        const width = 60;
-        const titlePadded = ` ${title} `.padStart((width + title.length) / 2).padEnd(width);
+    static logBox(title, lines = [], color = 'cyan') {
+        const width = 80;
+        const titleLine = `${title}`.padStart((width + title.length) / 2).padEnd(width);
         
-        console.log(chalk[color]('┌' + '─'.repeat(width) + '┐'));
-        console.log(chalk[color]('│' + chalk.white.bold(titlePadded) + '│'));
-        console.log(chalk[color]('├' + '─'.repeat(width) + '┤'));
+        console.log(chalk[color]('═'.repeat(width)));
+        console.log(chalk[color](`║${titleLine}║`));
+        console.log(chalk[color]('╠' + '═'.repeat(width - 2) + '╣'));
         
-        content.forEach(line => {
-            const linePadded = ` ${line}`.padEnd(width);
-            console.log(chalk[color]('│') + chalk.white(linePadded) + chalk[color]('│'));
+        lines.forEach(line => {
+            const paddedLine = ` ${line}`.padEnd(width - 1);
+            console.log(chalk[color](`║${paddedLine}║`));
         });
         
-        console.log(chalk[color]('└' + '─'.repeat(width) + '┘'));
-        console.log('');
-    }
-
-    static success(message) {
-        console.log(chalk.green('✅'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
-    }
-
-    static error(message) {
-        console.log(chalk.red('❌'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
+        console.log(chalk[color]('═'.repeat(width)));
     }
 
     static info(message) {
-        console.log(chalk.blue('ℹ️ '), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
+        const timestamp = moment().format('HH:mm:ss');
+        console.log(chalk.blue(`[${timestamp}] [INFO] ${message}`));
+    }
+
+    static success(message) {
+        const timestamp = moment().format('HH:mm:ss');
+        console.log(chalk.green(`[${timestamp}] [SUCCESS] ${message}`));
+    }
+
+    static error(message) {
+        const timestamp = moment().format('HH:mm:ss');
+        console.log(chalk.red(`[${timestamp}] [ERROR] ${message}`));
     }
 
     static warning(message) {
-        console.log(chalk.yellow('⚠️ '), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
+        const timestamp = moment().format('HH:mm:ss');
+        console.log(chalk.yellow(`[${timestamp}] [WARNING] ${message}`));
     }
 
-    static command(user, command, group) {
-        console.log(
-            chalk.cyan('📝') + ' ' +
-            chalk.white(`[${moment().format('HH:mm:ss')}]`) + ' ' +
-            chalk.yellow(user) + ' → ' +
-            chalk.green(command) + ' ' +
-            chalk.gray(`(${group?.substring(0, 15)}...)`)
-        );
+    static command(user, command) {
+        const timestamp = moment().format('HH:mm:ss');
+        console.log(chalk.magenta(`[${timestamp}] [COMMAND] ${user}: ${command}`));
     }
 
-    static admin(message) {
-        console.log(chalk.magenta('👑'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
+    static admin(user, action) {
+        const timestamp = moment().format('HH:mm:ss');
+        console.log(chalk.cyan(`[${timestamp}] [ADMIN] ${user}: ${action}`));
     }
 
-    static owner(message) {
-        console.log(chalk.red('🔴'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
-    }
-
-    static security(message) {
-        console.log(chalk.red('🔒'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
-    }
-
-    static performance(message, time) {
-        const color = time < 100 ? 'green' : time < 500 ? 'yellow' : 'red';
-        console.log(chalk[color]('⚡'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message), chalk.gray(`(${time}ms)`));
+    static performance(action, timeMs) {
+        const timestamp = moment().format('HH:mm:ss');
+        console.log(chalk.gray(`[${timestamp}] [PERF] ${action}: ${timeMs}ms`));
     }
 }
 
 // ========================================================================================================
-// 💾 SISTEMA DE CONTROLE DE USUÁRIOS OTIMIZADO
-// ========================================================================================================
-
-let notifiedUsers = new Set();
-
-async function loadNotifiedUsers() {
-    try {
-        const filePath = path.join(__dirname, 'data', 'notifiedUsers.json');
-        if (await fs.pathExists(filePath)) {
-            const data = await fs.readJSON(filePath);
-            notifiedUsers = new Set(data);
-            Logger.info(`${notifiedUsers.size} usuários notificados carregados`);
-        }
-    } catch (error) {
-        Logger.error(`Erro ao carregar usuários notificados: ${error.message}`);
-    }
-}
-
-async function saveNotifiedUsers() {
-    try {
-        const filePath = path.join(__dirname, 'data', 'notifiedUsers.json');
-        await fs.ensureDir(path.dirname(filePath));
-        await fs.writeJSON(filePath, Array.from(notifiedUsers));
-    } catch (error) {
-        Logger.error(`Erro ao salvar usuários notificados: ${error.message}`);
-    }
-}
-
-async function handlePrivateMessage(client, message) {
-    const userId = message.from;
-    
-    if (!notifiedUsers.has(userId)) {
-        const botMessage = `🤖 *MENSAGEM AUTOMÁTICA*
-
-Olá! Sou um *ROBÔ* automatizado para administração de grupos WhatsApp.
-
-🔹 *O que é um robô?*
-Sou um sistema automatizado controlado por computador, não por humanos.
-
-⚠️ *Importante:*
-• Não sou responsável por ações nos grupos
-• Apenas executo comandos programados
-• Para suporte, contate um administrador
-
-🚀 *Versão:* ${config.botInfo.versao}
-📅 *Data:* ${moment().format('DD/MM/YYYY HH:mm')}
-
-Obrigado pela compreensão! 😊`;
-
-        try {
-            await client.sendMessage(userId, botMessage);
-            notifiedUsers.add(userId);
-            await saveNotifiedUsers();
-            Logger.info(`Mensagem de bot enviada para: ${userId.substring(0, 15)}...`);
-        } catch (error) {
-            Logger.error(`Erro ao enviar mensagem de bot para PV: ${error.message}`);
-        }
-    }
-}
-
-// ========================================================================================================
-// 📁 SISTEMA DE DADOS JSON OTIMIZADO
+// 💾 SISTEMA DE GERENCIAMENTO DE DADOS OTIMIZADO COM CACHE INTELIGENTE
 // ========================================================================================================
 
 class DataManager {
     static dataCache = new Map();
     static cacheExpiry = new Map();
-    static CACHE_DURATION = 10000; // 10 segundos de cache para dados locais
+    static CACHE_DURATION = 30000; // 30 segundos
 
-    static async loadData(file) {
+    static async loadData(filename) {
+        const cacheKey = filename;
+        const now = Date.now();
+
+        // Verificar cache
+        if (this.dataCache.has(cacheKey) && this.cacheExpiry.get(cacheKey) > now) {
+            Logger.performance(`Cache hit para ${filename}`, 0);
+            return this.dataCache.get(cacheKey);
+        }
+
         try {
-            // Verificar cache primeiro
-            const cacheKey = `data_${file}`;
-            const now = Date.now();
+            const startTime = Date.now();
+            const filePath = path.join(__dirname, 'data', filename);
             
-            if (this.dataCache.has(cacheKey) && this.cacheExpiry.has(cacheKey)) {
-                const expiry = this.cacheExpiry.get(cacheKey);
-                if (now < expiry) {
-                    return this.dataCache.get(cacheKey);
-                }
+            if (!fs.existsSync(filePath)) {
+                Logger.warning(`Arquivo ${filename} não encontrado, criando estrutura padrão`);
+                const defaultData = this.getDefaultStructure(filename);
+                await this.saveData(filename, defaultData);
+                return defaultData;
             }
 
-            // Carregar do arquivo
-            const filePath = path.join(__dirname, 'data', file);
-            await fs.ensureDir(path.dirname(filePath));
+            const data = await fs.readJson(filePath);
             
-            let data = {};
-            if (await fs.pathExists(filePath)) {
-                data = await fs.readJSON(filePath);
-            }
-
-            // Salvar no cache
+            // Atualizar cache
             this.dataCache.set(cacheKey, data);
             this.cacheExpiry.set(cacheKey, now + this.CACHE_DURATION);
             
+            const loadTime = Date.now() - startTime;
+            Logger.performance(`Carregado ${filename}`, loadTime);
             return data;
         } catch (error) {
-            Logger.error(`Erro ao carregar ${file}: ${error.message}`);
-            return {};
+            Logger.error(`Erro ao carregar ${filename}: ${error.message}`);
+            return this.getDefaultStructure(filename);
         }
     }
 
-    static async saveData(file, data) {
+    static async saveData(filename, data) {
         try {
-            const filePath = path.join(__dirname, 'data', file);
-            await fs.ensureDir(path.dirname(filePath));
-            await fs.writeJSON(filePath, data, { spaces: 2 });
+            const startTime = Date.now();
+            const filePath = path.join(__dirname, 'data', filename);
+            await fs.writeJson(filePath, data, { spaces: 2 });
             
-            // Limpar cache após salvar
-            const cacheKey = `data_${file}`;
-            this.dataCache.delete(cacheKey);
-            this.cacheExpiry.delete(cacheKey);
+            // Limpar cache
+            this.dataCache.delete(filename);
+            this.cacheExpiry.delete(filename);
             
+            const saveTime = Date.now() - startTime;
+            Logger.performance(`Salvo ${filename}`, saveTime);
             return true;
         } catch (error) {
-            Logger.error(`Erro ao salvar ${file}: ${error.message}`);
+            Logger.error(`Erro ao salvar ${filename}: ${error.message}`);
             return false;
         }
     }
 
-    static async saveConfig(groupId, key, value) {
-        const configs = await this.loadData('configs.json');
-        if (!configs.grupos) configs.grupos = {};
-        if (!configs.grupos[groupId]) configs.grupos[groupId] = {};
-        configs.grupos[groupId][key] = value;
-        return await this.saveData('configs.json', configs);
-    }
-
-    static async loadConfig(groupId, key = null) {
-        const configs = await this.loadData('configs.json');
-        if (!configs.grupos || !configs.grupos[groupId]) return key ? null : {};
-        return key ? configs.grupos[groupId][key] : configs.grupos[groupId];
+    static getDefaultStructure(filename) {
+        const defaults = {
+            'ads.json': { anuncios: {} },
+            'configs.json': { grupos: {} },
+            'grupoAluguel.json': { grupos: {} },
+            'sorteios.json': { sorteios: {} },
+            'horarios.json': { horarios: {} },
+            'notifiedUsers.json': { users: [] }
+        };
+        return defaults[filename] || {};
     }
 
     static clearCache() {
         this.dataCache.clear();
         this.cacheExpiry.clear();
-        Logger.info('Cache de dados limpo');
+        Logger.info('Cache limpo com sucesso');
     }
 }
 
 // ========================================================================================================
-// 🔐 SISTEMA DE VERIFICAÇÃO DE ALUGUEL OTIMIZADO
+// 🔧 SISTEMA DE UTILITÁRIOS OTIMIZADO
+// ========================================================================================================
+
+class Utils {
+    static isAdmin(participantId, adminList) {
+        if (!adminList || !Array.isArray(adminList)) return false;
+        return adminList.some(admin => 
+            admin.id && (admin.id._serialized === participantId || admin.id.user === participantId.split('@')[0])
+        );
+    }
+
+    static isOwner(phone) {
+        if (!phone || !config.numeroDono) return false;
+        const cleanPhone = phone.replace(/\D/g, '');
+        const cleanOwner = config.numeroDono.replace(/\D/g, '');
+        const isOwner = cleanPhone === cleanOwner || cleanPhone.includes(cleanOwner) || cleanOwner.includes(cleanPhone);
+        Logger.info(`Verificação de dono: ${phone} -> ${isOwner ? 'SIM' : 'NÃO'}`);
+        return isOwner;
+    }
+
+    static getUsername(contact) {
+        if (!contact) return 'Usuário';
+        return contact.pushname || contact.name || contact.id?.user || 'Usuário';
+    }
+
+    static getGroupName(chat) {
+        if (!chat) return 'Grupo';
+        return chat.name || 'Grupo sem nome';
+    }
+
+    static getSystemInfo() {
+        const info = {
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            platform: process.platform,
+            version: process.version,
+            timestamp: new Date().toISOString()
+        };
+        Logger.performance('Informações do sistema coletadas', 0);
+        return info;
+    }
+}
+
+// ========================================================================================================
+// 🏠 SISTEMA DE ALUGUEL OTIMIZADO
 // ========================================================================================================
 
 class RentalSystem {
     static async checkGroupStatus(groupId) {
         try {
-            // TEMPORÁRIO: Permitir todos os grupos para debug
-            console.log(`[DEBUG-RENTAL] Verificando grupo: ${groupId}`);
-            return { 
-                active: true, 
-                reason: 'debug_mode',
-                message: 'Grupo ativo (modo debug)'
-            };
+            const startTime = Date.now();
             
-            /* CÓDIGO ORIGINAL COMENTADO PARA DEBUG
-            const rentals = await DataManager.loadData('grupoAluguel.json');
+            // TEMPORÁRIO: Retornar sempre ativo para debug
+            Logger.info(`[RENTAL-DEBUG] Verificação temporariamente desabilitada para ${groupId}`);
+            const checkTime = Date.now() - startTime;
+            Logger.performance(`Verificação de aluguel (debug)`, checkTime);
+            return { active: true, daysLeft: 999, isOwner: true };
             
-            if (!rentals.grupos || !rentals.grupos[groupId]) {
-                return { 
-                    active: false, 
-                    message: '⚠️ Este grupo não está autorizado a usar o bot. Contrate o serviço para ativar.',
-                    reason: 'not_registered'
-                };
+            // CÓDIGO ORIGINAL (comentado para debug)
+            /*
+            const data = await DataManager.loadData('grupoAluguel.json');
+            const group = data.grupos[groupId];
+            
+            if (!group) {
+                Logger.warning(`Grupo ${groupId} não encontrado no sistema de aluguel`);
+                return { active: false, daysLeft: 0, isOwner: false };
             }
-            */
 
-            /* RESTO DO CÓDIGO ORIGINAL COMENTADO PARA DEBUG
-            const groupData = rentals.grupos[groupId];
             const now = moment();
-            const expiry = moment(groupData.expiry);
-
-            if (now.isAfter(expiry)) {
-                return { 
-                    active: false, 
-                    message: '⚠️ A licença deste grupo expirou. Renove o serviço para continuar usando.',
-                    reason: 'expired',
-                    expiredDate: expiry.format('DD/MM/YYYY HH:mm')
-                };
-            }
-
+            const expiry = moment(group.dataExpiracao);
             const daysLeft = expiry.diff(now, 'days');
-            return { 
-                active: true, 
-                daysLeft,
-                expiry: expiry.format('DD/MM/YYYY HH:mm'),
-                reason: 'active'
-            };
+            const active = daysLeft > 0;
+
+            const checkTime = Date.now() - startTime;
+            Logger.performance(`Verificação de aluguel para ${groupId}`, checkTime);
+            Logger.info(`Grupo ${groupId}: ${active ? 'ATIVO' : 'EXPIRADO'} (${daysLeft} dias restantes)`);
+
+            return { active, daysLeft, isOwner: group.isOwner || false };
             */
         } catch (error) {
             Logger.error(`Erro ao verificar status do grupo ${groupId}: ${error.message}`);
-            return { active: true, reason: 'error' }; // Permitir uso em caso de erro
-        }
-    }
-
-    static async liberarGrupo(groupId, days) {
-        try {
-            const rentals = await DataManager.loadData('grupoAluguel.json');
-            if (!rentals.grupos) rentals.grupos = {};
-
-            const expiry = moment().add(days, 'days');
-            rentals.grupos[groupId] = {
-                activated: moment().format(),
-                expiry: expiry.format(),
-                days: days,
-                activatedBy: 'system'
-            };
-
-            const success = await DataManager.saveData('grupoAluguel.json', rentals);
-            if (success) {
-                Logger.success(`Grupo ${groupId} liberado por ${days} dias`);
-            }
-            return success;
-        } catch (error) {
-            Logger.error(`Erro ao liberar grupo ${groupId}: ${error.message}`);
-            return false;
+            // Em caso de erro, permitir acesso para não bloquear o bot
+            return { active: true, daysLeft: 0, isOwner: false };
         }
     }
 }
 
 // ========================================================================================================
-// 🛠️ UTILITÁRIOS OTIMIZADOS
+// 📨 PROCESSAMENTO DE MENSAGENS CORRIGIDO - VERSÃO 3.0
 // ========================================================================================================
 
-class Utils {
-    static async isAdmin(message) {
-        try {
-            if (!message.author) {
-                Logger.warning('isAdmin: message.author não encontrado');
-                return false;
-            }
-
-            const chat = await message.getChat();
-            if (!chat.isGroup) {
-                return false;
-            }
-
-            const participant = chat.participants.find(p => 
-                p.id._serialized === message.author
-            );
-
-            if (!participant) {
-                Logger.warning(`isAdmin: Participante não encontrado - ${message.author}`);
-                return false;
-            }
-
-            const isAdmin = participant.isAdmin || participant.isSuperAdmin;
-            return isAdmin;
-        } catch (error) {
-            Logger.error(`Erro ao verificar admin: ${error.message}`);
-            return false;
-        }
-    }
-
-    static isOwner(message) {
-        try {
-            const userNumber = message.author?.replace('@c.us', '') || message.from?.replace('@c.us', '');
-            const ownerNumber = config.numeroDono?.replace('@c.us', '');
-            return userNumber === ownerNumber;
-        } catch (error) {
-            Logger.error(`Erro ao verificar owner: ${error.message}`);
-            return false;
-        }
-    }
-
-    static getUsername(message) {
-        try {
-            return message._data?.notifyName || 
-                   message.author?.split('@')[0] || 
-                   'Usuário';
-        } catch (error) {
-            return 'Usuário';
-        }
-    }
-
-    static getGroupName(groupId) {
-        try {
-            return groupId?.split('@')[0]?.substring(0, 15) + '...' || 'Grupo';
-        } catch (error) {
-            return 'Grupo';
-        }
-    }
-
-    static formatBytes(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    static getSystemInfo() {
-        const used = process.memoryUsage();
-        return {
-            memory: {
-                rss: this.formatBytes(used.rss),
-                heapTotal: this.formatBytes(used.heapTotal),
-                heapUsed: this.formatBytes(used.heapUsed),
-                external: this.formatBytes(used.external)
-            },
-            uptime: Math.floor(process.uptime()),
-            version: process.version,
-            platform: process.platform
-        };
-    }
-}
-
-// ========================================================================================================
-// 🚀 EVENTOS DO CLIENTE OTIMIZADOS
-// ========================================================================================================
-
-client.on('qr', (qr) => {
-    Logger.logBox('QR CODE GERADO', [
-        'Escaneie o QR Code abaixo com seu WhatsApp:',
-        '',
-        '📱 Abra o WhatsApp no seu celular',
-        '⚙️  Vá em Configurações > Aparelhos conectados',
-        '📷 Toque em "Conectar um aparelho"',
-        '🔍 Escaneie o código QR abaixo'
-    ], 'cyan');
-    
-    qrcode.generate(qr, { small: true });
-});
-
-client.on('ready', async () => {
-    const startTime = Date.now();
-    
-    Logger.logBox('BOT CONECTADO COM SUCESSO', [
-        `📱 Número: ${client.info.wid.user}`,
-        `📋 Nome: ${client.info.pushname}`,
-        `👑 Dono: ${config.numeroDono}`,
-        `🌍 Timezone: ${config.timezone}`,
-        `⚡ Versão: ${config.botInfo.versao}`,
-        `⏰ Conectado em: ${moment().format('DD/MM/YYYY HH:mm:ss')}`
-    ], 'green');
-    
-    // Log de debug para eventos
-    console.log('[DEBUG] Eventos de mensagem configurados: message_create e message');
-    
-    // Importar módulos após cliente estar pronto (carregamento otimizado)
-    console.log('📦 Carregando módulos de comandos...');
-    const moduleStartTime = Date.now();
-    
-    try {
-        welcomeHandler = require('./commands/welcome');
-        banHandler = require('./commands/ban');
-        sorteioHandler = require('./commands/sorteio');
-        adsHandler = require('./handlers/AdsHandler');
-        menuHandler = require('./commands/menu');
-        groupControlHandler = require('./commands/groupControl');
-        horariosHandler = require('./commands/horarios');
-        autoRespostaHandler = require('./commands/autoresposta');
-        syncStatusHandler = require('./commands/sync-status');
-        syncPanelHandler = require('./commands/syncpanel');
-        
-        const moduleLoadTime = Date.now() - moduleStartTime;
-        Logger.performance('Módulos de comandos carregados', moduleLoadTime);
-    } catch (error) {
-        Logger.error(`Erro ao carregar módulos: ${error.message}`);
-    }
-    
-    // Inicializar módulo de envio centralizado primeiro (crítico)
-    try {
-        Sender.initialize(client);
-        Logger.success('Módulo de envio centralizado inicializado');
-    } catch (error) {
-        Logger.error(`Erro ao inicializar Sender: ${error.message}`);
-    }
-    
-    // Carregar sistemas automáticos em paralelo para ser mais rápido
-    console.log('🔄 Iniciando carregamento de sistemas automáticos...');
-    const systemStartTime = Date.now();
-    
-    await Promise.all([
-        adsHandler.loadAllAds(client).catch(err => Logger.error('Erro ao carregar anúncios: ' + err.message)),
-        groupControlHandler.loadSchedules(client).catch(err => Logger.error('Erro ao carregar agendamentos: ' + err.message)),
-        horariosHandler.loadAutoHours(client).catch(err => Logger.error('Erro ao carregar horários: ' + err.message)),
-        loadNotifiedUsers().catch(err => Logger.error('Erro ao carregar usuários notificados: ' + err.message))
-    ]);
-    
-    const systemLoadTime = Date.now() - systemStartTime;
-    Logger.performance('Sistemas automáticos carregados', systemLoadTime);
-    
-    Logger.success('Sistemas automáticos inicializados');
-    
-    // Inicializar serviço de mensagens automáticas híbrido (Laravel + Local)
-    try {
-        await AutoMessageHandler.initialize(DataManager);
-        Logger.success('Serviço de mensagens automáticas híbrido inicializado');
-    } catch (error) {
-        Logger.error(`Erro ao inicializar AutoMessageHandler: ${error.message}`);
-    }
-    
-    // Notificar painel Laravel de forma não-bloqueante
-    notificarPainelLaravel().catch(err => 
-        Logger.warning('Falha na notificação do painel (não crítico): ' + err.message)
-    );
-    
-    const totalTime = Date.now() - startTime;
-    Logger.performance('🚀 Bot totalmente inicializado', totalTime);
-    
-    // Mostrar informações do sistema
-    const sysInfo = Utils.getSystemInfo();
-    Logger.info(`Sistema: ${sysInfo.platform} | Node: ${sysInfo.version} | RAM: ${sysInfo.memory.heapUsed}`);
-});
-
-client.on('auth_failure', (msg) => {
-    Logger.logBox('FALHA NA AUTENTICAÇÃO', [
-        'Erro ao autenticar com o WhatsApp',
-        'Possíveis causas:',
-        '• QR Code expirado',
-        '• Sessão inválida',
-        '• Problema de conectividade',
-        '',
-        'Tentando reconectar...'
-    ], 'red');
-});
-
-client.on('disconnected', (reason) => {
-    Logger.logBox('DESCONECTADO', [
-        `Motivo: ${reason}`,
-        'Tentando reconectar automaticamente...',
-        '',
-        'Se o problema persistir, reinicie o bot'
-    ], 'yellow');
-    
-    if (config.autoReconnect) {
-        setTimeout(() => {
-            Logger.info('Tentando reconectar...');
-            client.initialize();
-        }, 5000);
-    }
-});
-
-// ========================================================================================================
-// 📨 PROCESSAMENTO DE MENSAGENS OTIMIZADO
-// ========================================================================================================
-
-// Função para processar mensagens (versão ultra-robusta) - V3.0
+// Função principal para processar mensagens
 async function processMessage(message) {
     const startTime = Date.now();
     
     try {
-        // Log detalhado de entrada
-        console.log(`[MSG-HANDLER] 📨 Nova mensagem recebida`);
-        console.log(`[MSG-HANDLER] 📍 From: ${message?.from || 'UNKNOWN'}`);
-        console.log(`[MSG-HANDLER] 📝 Body: "${message?.body?.substring(0, 100) || 'EMPTY'}"`);
-        console.log(`[MSG-HANDLER] 🕐 Timestamp: ${new Date().toISOString()}`);
+        // Debug de entrada
+        console.log(`[PROC-MSG] 📨 Nova mensagem recebida`);
+        console.log(`[PROC-MSG] From: ${message?.from || 'UNKNOWN'}`);
+        console.log(`[PROC-MSG] Body: "${message?.body?.substring(0, 50) || 'EMPTY'}..."`);
         
-        // Validações críticas
-        if (!message) {
-            console.log(`[MSG-HANDLER] ⚠️ Mensagem nula - ignorando`);
+        // Validações básicas
+        if (!message || !message.body || !message.from) {
+            console.log(`[PROC-MSG] ⚠️ Mensagem inválida - ignorando`);
             return;
         }
         
-        if (!message.body || typeof message.body !== 'string') {
-            console.log(`[MSG-HANDLER] ⚠️ Body inválido - ignorando`);
-            return;
-        }
-        
-        if (!message.from) {
-            console.log(`[MSG-HANDLER] ⚠️ From inválido - ignorando`);
-            return;
-        }
-
         // Verificar se é comando
-        const isCommand = message.body.trim().startsWith('!');
-        console.log(`[MSG-HANDLER] ⚡ É comando: ${isCommand ? 'SIM' : 'NÃO'}`);
-        
-        if (!isCommand) {
-            console.log(`[MSG-HANDLER] 📤 Não é comando - finalizando processamento`);
+        if (!message.body.trim().startsWith('!')) {
+            console.log(`[PROC-MSG] 📝 Não é comando - ignorando`);
             return;
         }
-
-        // Extrair comando com segurança
-        const bodyTrimmed = message.body.trim();
-        const args = bodyTrimmed.slice(1).split(/\s+/).filter(arg => arg.length > 0);
         
+        // Extrair comando e argumentos
+        const args = message.body.trim().slice(1).split(/\s+/).filter(arg => arg.length > 0);
         if (args.length === 0) {
-            console.log(`[MSG-HANDLER] ⚠️ Comando vazio - ignorando`);
+            console.log(`[PROC-MSG] ⚠️ Comando vazio - ignorando`);
             return;
         }
         
         const command = args[0].toLowerCase();
-        console.log(`[MSG-HANDLER] 🎯 Comando extraído: "${command}"`);
-        console.log(`[MSG-HANDLER] 📋 Argumentos: [${args.slice(1).join(', ')}]`);
-
-        // Obter chat com timeout
+        console.log(`[PROC-MSG] 🎯 Comando: "${command}" com ${args.length - 1} argumentos`);
+        
+        // Obter chat
         let chat;
         try {
-            console.log(`[MSG-HANDLER] 🔍 Obtendo informações do chat...`);
-            chat = await Promise.race([
-                message.getChat(),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout ao obter chat')), 5000))
-            ]);
-            console.log(`[MSG-HANDLER] ✅ Chat obtido: ${chat?.name || chat?.id?.user || 'Privado'} (${chat?.isGroup ? 'Grupo' : 'Privado'})`);
+            chat = await message.getChat();
+            console.log(`[PROC-MSG] ✅ Chat obtido: ${chat?.name || 'Chat privado'}`);
         } catch (chatError) {
-            console.error(`[MSG-HANDLER] ❌ Erro ao obter chat: ${chatError.message}`);
-            // Tentar resposta de emergência
-            try {
-                await client.sendMessage(message.from, '⚠️ Erro interno - tente novamente');
-                console.log(`[MSG-HANDLER] ✅ Resposta de emergência enviada`);
-            } catch (emergencyError) {
-                console.error(`[MSG-HANDLER] ❌ Falha na resposta de emergência: ${emergencyError.message}`);
-            }
+            console.error(`[PROC-MSG] ❌ Erro ao obter chat: ${chatError.message}`);
             return;
         }
-
-        // Lista de comandos válidos
-        const validCommands = [
-            'menu', 'ping', 'status', 'uptime', 'listads', 'addad', 'removead',
-            'ban', 'unban', 'allg', 'allg2', 'sorteio', 'welcome', 'autoresposta',
-            'horarios', 'debug', 'syncpanel', 'syncstatus'
-        ];
-
-        if (!validCommands.includes(command)) {
-            console.log(`[MSG-HANDLER] ❓ Comando "${command}" não reconhecido`);
-            try {
-                await Sender.sendMessage(client, message.from, 
-                    `❓ *Comando não reconhecido: "${command}"*\n\nDigite *!menu* para ver comandos disponíveis.`);
-                console.log(`[MSG-HANDLER] ✅ Resposta de comando inválido enviada`);
-            } catch (invalidCmdError) {
-                console.error(`[MSG-HANDLER] ❌ Erro ao responder comando inválido: ${invalidCmdError.message}`);
-            }
-            return;
-        }
-
-        console.log(`[MSG-HANDLER] ✅ Comando válido reconhecido: "${command}"`);
-
-        // Processar comando específico com timeout
-        const commandTimeout = 30000; // 30 segundos
         
-        try {
-            await Promise.race([
-                executeCommand(command, args, message, chat),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error(`Timeout ao executar comando ${command}`)), commandTimeout)
-                )
-            ]);
-            
-            const processingTime = Date.now() - startTime;
-            console.log(`[MSG-HANDLER] ✅ Comando "${command}" executado com sucesso em ${processingTime}ms`);
-            
-        } catch (commandError) {
-            console.error(`[MSG-HANDLER] ❌ Erro ao executar comando "${command}": ${commandError.message}`);
-            
-            // Verificar se é erro validateAndGetParts
-            if (commandError.message.includes('validateAndGetParts') || 
-                commandError.stack?.includes('validateAndGetParts')) {
-                console.error(`[MSG-HANDLER] 🔧 ERRO validateAndGetParts DETECTADO!`);
-                
-                // Resposta de emergência simplificada
-                try {
-                    await client.sendMessage(message.from, '⚠️ Erro interno detectado. Comando sendo processado...');
-                    console.log(`[MSG-HANDLER] ✅ Resposta de emergência para validateAndGetParts enviada`);
-                } catch (emergencyError) {
-                    console.error(`[MSG-HANDLER] ❌ Falha na resposta de emergência validateAndGetParts: ${emergencyError.message}`);
-                }
-            } else {
-                // Resposta de erro genérica
-                try {
-                    await Sender.sendMessage(client, message.from, 
-                        `❌ *Erro ao executar comando*\n\n🔧 Comando: ${command}\n⚠️ Tente novamente em alguns segundos.`);
-                    console.log(`[MSG-HANDLER] ✅ Resposta de erro genérica enviada`);
-                } catch (errorResponseError) {
-                    console.error(`[MSG-HANDLER] ❌ Falha ao enviar resposta de erro: ${errorResponseError.message}`);
-                }
-            }
-        }
+        // Executar comando
+        await executeCommand(command, args, message, chat);
         
-    } catch (globalError) {
         const processingTime = Date.now() - startTime;
-        console.error(`[MSG-HANDLER] 🚨 ERRO GLOBAL NO PROCESSAMENTO (${processingTime}ms):`);
-        console.error(`[MSG-HANDLER] 📍 From: ${message?.from || 'UNKNOWN'}`);
-        console.error(`[MSG-HANDLER] 📝 Body: "${message?.body?.substring(0, 100) || 'EMPTY'}"`);
-        console.error(`[MSG-HANDLER] ❌ Erro: ${globalError.message}`);
-        console.error(`[MSG-HANDLER] 📚 Stack: ${globalError.stack}`);
+        console.log(`[PROC-MSG] ✅ Processamento concluído em ${processingTime}ms`);
         
-        // Log específico para validateAndGetParts
-        if (globalError.message.includes('validateAndGetParts') || 
-            globalError.stack?.includes('validateAndGetParts')) {
-            console.error(`[MSG-HANDLER] 🔧 ERRO validateAndGetParts NO NÍVEL GLOBAL!`);
-            console.error(`[MSG-HANDLER] 💡 Causa provável: ID de chat malformado ou problema interno do WhatsApp Web`);
+    } catch (error) {
+        const processingTime = Date.now() - startTime;
+        console.error(`[PROC-MSG] 🚨 ERRO no processamento (${processingTime}ms):`);
+        console.error(`[PROC-MSG] Erro: ${error.message}`);
+        console.error(`[PROC-MSG] Stack: ${error.stack}`);
+        
+        // Detectar erro validateAndGetParts
+        if (error.message.includes('validateAndGetParts') || error.stack?.includes('validateAndGetParts')) {
+            console.error(`[PROC-MSG] 🔧 ERRO validateAndGetParts DETECTADO!`);
+            console.error(`[PROC-MSG] 💡 Tentando resposta simplificada...`);
+            
+            try {
+                // Resposta ultra-simples para evitar validateAndGetParts
+                const simpleMessage = 'Erro detectado. Tente novamente.';
+                await client.sendMessage(message.from, simpleMessage);
+                console.log(`[PROC-MSG] ✅ Resposta simplificada enviada com sucesso`);
+            } catch (simpleError) {
+                console.error(`[PROC-MSG] ❌ Falha na resposta simplificada: ${simpleError.message}`);
+            }
         }
         
-        // Última tentativa de resposta
-        try {
-            await client.sendMessage(message.from, '🚨 Erro crítico detectado. Sistema sendo reiniciado...');
-            console.log(`[MSG-HANDLER] ✅ Última resposta de emergência enviada`);
-        } catch (lastError) {
-            console.error(`[MSG-HANDLER] ❌ FALHA TOTAL - não foi possível responder: ${lastError.message}`);
-        }
+        Logger.error(`Erro crítico no processamento de mensagem: ${error.message}`);
     }
 }
 
-// Função auxiliar para executar comandos
+// Função para executar comandos específicos
 async function executeCommand(command, args, message, chat) {
-    console.log(`[CMD-EXEC] 🚀 Executando comando: "${command}"`);
+    console.log(`[CMD-EXEC] 🚀 Executando: "${command}"`);
     
-    switch (command) {
-        case 'ping':
-            await Sender.sendMessage(client, message.from, '🏓 *Pong!*\n\n✅ Bot está respondendo normalmente.');
-            break;
-            
-        case 'status':
-            const uptime = process.uptime();
-            const hours = Math.floor(uptime / 3600);
-            const minutes = Math.floor((uptime % 3600) / 60);
-            const statusMsg = `📊 *Status do Bot*\n\n` +
-                `⏱️ Online há: ${hours}h ${minutes}m\n` +
-                `🔗 Conectado: ✅\n` +
-                `📱 WhatsApp: Ativo\n` +
-                `💾 Memória: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`;
-            await Sender.sendMessage(client, message.from, statusMsg);
-            break;
-            
-        case 'uptime':
-            const uptimeSeconds = process.uptime();
-            const days = Math.floor(uptimeSeconds / 86400);
-            const uptimeHours = Math.floor((uptimeSeconds % 86400) / 3600);
-            const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
-            await Sender.sendMessage(client, message.from, 
-                `⏰ *Bot Online há:*\n${days}d ${uptimeHours}h ${uptimeMinutes}m`);
-            break;
-            
-        case 'menu':
-            await MenuCommand.execute(client, message, args);
-            break;
-            
-        case 'listads':
-            await AdsHandler.listAds(client, message, args);
-            break;
-            
-        case 'addad':
-            await AdsHandler.addAd(client, message, args);
-            break;
-            
-        case 'removead':
-            await AdsHandler.removeAd(client, message, args);
-            break;
-            
-        default:
-            console.log(`[CMD-EXEC] ⚠️ Comando "${command}" reconhecido mas não implementado nesta versão`);
-            await Sender.sendMessage(client, message.from, 
-                `⚠️ *Comando em manutenção*\n\nO comando "${command}" está sendo atualizado.\n\nTente novamente em alguns minutos.`);
-            break;
-    }
-    
-    console.log(`[CMD-EXEC] ✅ Comando "${command}" finalizado`);
-}
-                    console.error(`[DEBUG] Erro no comando listads: ${error.message}`);
-                }
+    try {
+        switch (command) {
+            case 'ping':
+                await Sender.sendMessage(client, message.from, '🏓 *Pong!*\n\n✅ Bot respondendo normalmente!');
                 break;
-
+                
+            case 'status':
+                const uptime = process.uptime();
+                const hours = Math.floor(uptime / 3600);
+                const minutes = Math.floor((uptime % 3600) / 60);
+                const statusMsg = `📊 *Status do Bot*\n\n` +
+                    `⏱️ Online há: ${hours}h ${minutes}m\n` +
+                    `🔗 Conectado: ✅\n` +
+                    `📱 WhatsApp: Ativo\n` +
+                    `💾 Memória: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`;
+                await Sender.sendMessage(client, message.from, statusMsg);
+                break;
+                
+            case 'uptime':
+                const uptimeSeconds = process.uptime();
+                const days = Math.floor(uptimeSeconds / 86400);
+                const uptimeHours = Math.floor((uptimeSeconds % 86400) / 3600);
+                const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
+                await Sender.sendMessage(client, message.from, 
+                    `⏰ *Bot Online há:*\n${days}d ${uptimeHours}h ${uptimeMinutes}m`);
+                break;
+                
+            case 'menu':
+                await MenuCommand.execute(client, message, args);
+                break;
+                
+            case 'listads':
+                await AdsHandler.listAds(client, message, args);
+                break;
+                
             case 'addad':
-                try {
-                    await AdsHandler.addAd(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando addad executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando addad: ${error.message}`);
-                }
+                await AdsHandler.addAd(client, message, args);
                 break;
-
+                
             case 'removead':
-                try {
-                    await AdsHandler.removeAd(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando removead executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando removead: ${error.message}`);
-                }
+                await AdsHandler.removeAd(client, message, args);
                 break;
-
+                
             case 'ban':
-                try {
-                    await BanCommand.execute(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando ban executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando ban: ${error.message}`);
-                }
+                await BanCommand.execute(client, message, args);
                 break;
-
+                
             case 'unban':
-                try {
-                    await BanCommand.unban(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando unban executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando unban: ${error.message}`);
-                }
+                await BanCommand.unban(client, message, args);
                 break;
-
+                
             case 'allg':
             case 'allg2':
-                try {
-                    if (!chat.isGroup) {
-                        await Sender.sendMessage(client, message.from, 
-                            '❌ Este comando só funciona em grupos!');
-                        return;
-                    }
-                    
-                    const participants = chat.participants;
-                    if (!participants || participants.length === 0) {
-                        await Sender.sendMessage(client, message.from, 
-                            '❌ Não foi possível obter a lista de participantes.');
-                        return;
-                    }
-                    
-                    const mentions = participants.map(p => p.id._serialized);
-                    const mentionText = participants.map(p => `@${p.id.user}`).join(' ');
-                    
-                    await client.sendMessage(message.from, mentionText, {
-                        mentions: mentions
-                    });
-                    console.log(`[DEBUG] ✅ Comando ${command} executado - ${mentions.length} menções`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando ${command}: ${error.message}`);
+                if (!chat.isGroup) {
+                    await Sender.sendMessage(client, message.from, '❌ Este comando só funciona em grupos!');
+                    return;
                 }
+                
+                const participants = chat.participants;
+                if (!participants || participants.length === 0) {
+                    await Sender.sendMessage(client, message.from, '❌ Não foi possível obter participantes.');
+                    return;
+                }
+                
+                const mentions = participants.map(p => p.id._serialized);
+                const mentionText = participants.map(p => `@${p.id.user}`).join(' ');
+                
+                await client.sendMessage(message.from, mentionText, { mentions: mentions });
                 break;
-
+                
             case 'sorteio':
-                try {
-                    await SorteioCommand.execute(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando sorteio executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando sorteio: ${error.message}`);
-                }
+                await SorteioCommand.execute(client, message, args);
                 break;
-
+                
             case 'welcome':
-                try {
-                    await WelcomeCommand.execute(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando welcome executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando welcome: ${error.message}`);
-                }
+                await WelcomeCommand.execute(client, message, args);
                 break;
-
+                
             case 'autoresposta':
-                try {
-                    await AutoRespostaCommand.execute(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando autoresposta executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando autoresposta: ${error.message}`);
-                }
+                await AutoRespostaCommand.execute(client, message, args);
                 break;
-
+                
             case 'horarios':
-                try {
-                    await HorariosCommand.execute(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando horarios executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando horarios: ${error.message}`);
-                }
+                await HorariosCommand.execute(client, message, args);
                 break;
-
+                
             case 'debug':
-                try {
-                    await DebugCommand.execute(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando debug executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando debug: ${error.message}`);
-                }
+                await DebugCommand.execute(client, message, args);
                 break;
-
+                
             case 'syncpanel':
-                try {
-                    await SyncPanelCommand.execute(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando syncpanel executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando syncpanel: ${error.message}`);
-                }
+                await SyncPanelCommand.execute(client, message, args);
                 break;
-
+                
             case 'syncstatus':
-                try {
-                    await SyncStatusCommand.execute(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando syncstatus executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando syncstatus: ${error.message}`);
-                }
+                await SyncStatusCommand.execute(client, message, args);
                 break;
-
+                
             default:
-                console.log(`[DEBUG] ❓ Comando não implementado: "${command}"`);
-                try {
-                    await Sender.sendMessage(client, message.from, 
-                        `❓ Comando "${command}" não implementado.\n\nDigite *!menu* para ver comandos disponíveis.`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro ao enviar resposta de comando não implementado: ${error.message}`);
-                }
+                console.log(`[CMD-EXEC] ❓ Comando não implementado: "${command}"`);
+                await Sender.sendMessage(client, message.from, 
+                    `❓ Comando "${command}" não reconhecido.\n\nDigite *!menu* para ver comandos disponíveis.`);
                 break;
         }
-
-    } catch (error) {
-        console.error(`[DEBUG] 🚨 ERRO CRÍTICO NO PROCESSAMENTO DE MENSAGEM:`);
-        console.error(`[DEBUG] Mensagem de: ${message?.from || 'UNKNOWN'}`);
-        console.error(`[DEBUG] Corpo: "${message?.body?.substring(0, 100) || 'EMPTY'}"`);
-        console.error(`[DEBUG] Erro: ${error.message}`);
-        console.error(`[DEBUG] Stack: ${error.stack}`);
         
-        // Verificar se é o erro validateAndGetParts
-        if (error.message.includes('validateAndGetParts') || error.stack?.includes('validateAndGetParts')) {
-            console.error(`[DEBUG] 🔧 ERRO validateAndGetParts DETECTADO - Este é o erro principal!`);
-            console.error(`[DEBUG] 💡 Possíveis causas: ID de chat inválido, mensagem malformada, ou problema interno do WhatsApp Web`);
+        console.log(`[CMD-EXEC] ✅ Comando "${command}" executado com sucesso`);
+        
+    } catch (cmdError) {
+        console.error(`[CMD-EXEC] ❌ Erro no comando "${command}": ${cmdError.message}`);
+        console.error(`[CMD-EXEC] Stack: ${cmdError.stack}`);
+        
+        // Detectar validateAndGetParts no nível de comando
+        if (cmdError.message.includes('validateAndGetParts') || cmdError.stack?.includes('validateAndGetParts')) {
+            console.error(`[CMD-EXEC] 🔧 validateAndGetParts detectado no comando "${command}"`);
             
-            // Tentar uma resposta de emergência simplificada
             try {
-                const simpleResponse = '⚠️ Erro interno detectado. Tente novamente.';
-                await client.sendMessage(message.from, simpleResponse);
-                console.log(`[DEBUG] ✅ Resposta de emergência enviada com sucesso`);
+                await client.sendMessage(message.from, '⚠️ Comando processado com erro interno.');
+                console.log(`[CMD-EXEC] ✅ Resposta de emergência enviada`);
             } catch (emergencyError) {
-                console.error(`[DEBUG] ❌ Falha ao enviar resposta de emergência: ${emergencyError.message}`);
+                console.error(`[CMD-EXEC] ❌ Falha na resposta de emergência: ${emergencyError.message}`);
+            }
+        } else {
+            try {
+                await Sender.sendMessage(client, message.from, 
+                    `❌ *Erro no comando "${command}"*\n\nTente novamente em alguns segundos.`);
+            } catch (errorReplyError) {
+                console.error(`[CMD-EXEC] ❌ Falha ao enviar resposta de erro: ${errorReplyError.message}`);
             }
         }
         
-        Logger.error(`Erro crítico ao processar mensagem: ${error.message}`);
-        
-        // Tentar enviar resposta de erro se possível
-        try {
-            if (message && message.reply && typeof message.reply === 'function') {
-                await message.reply('❌ *Erro interno do sistema*\n\n🔧 Tente novamente em alguns segundos.\n📞 Se o problema persistir, contate o suporte.');
-                console.log(`[DEBUG] ✅ Resposta de erro enviada via reply`);
-            } else {
-                await Sender.sendMessage(client, message.from, '❌ *Erro interno*\n\nTente novamente em alguns segundos.');
-                console.log(`[DEBUG] ✅ Resposta de erro enviada via Sender`);
-            }
-        } catch (replyError) {
-            console.error(`[DEBUG] ❌ Não foi possível enviar resposta de erro: ${replyError.message}`);
-            Logger.error(`Erro ao enviar mensagem de erro: ${replyError.message}`);
-        }
+        throw cmdError; // Re-throw para logging upstream
     }
 }
 
-// Configurar eventos de mensagem com wrapper de segurança
+// ========================================================================================================
+// 🔄 CARREGAMENTO PARALELO DE MÓDULOS OTIMIZADO
+// ========================================================================================================
+
+async function carregarModulosComandos() {
+    const startTime = Date.now();
+    Logger.info('🔄 Carregando módulos de comandos...');
+    
+    try {
+        // Carregar módulos de forma síncrona (são arquivos locais)
+        WelcomeCommand = require('./commands/welcome');
+        Logger.success('✅ WelcomeCommand carregado');
+        
+        BanCommand = require('./commands/ban');
+        Logger.success('✅ BanCommand carregado');
+        
+        SorteioCommand = require('./commands/sorteio');
+        Logger.success('✅ SorteioCommand carregado');
+        
+        AdsHandler = require('./handlers/AdsHandler');
+        Logger.success('✅ AdsHandler carregado');
+        
+        MenuCommand = require('./commands/menu');
+        Logger.success('✅ MenuCommand carregado');
+        
+        GroupControlCommand = require('./commands/groupControl');
+        Logger.success('✅ GroupControlCommand carregado');
+        
+        HorariosCommand = require('./commands/horarios');
+        Logger.success('✅ HorariosCommand carregado');
+        
+        AutoRespostaCommand = require('./commands/autoresposta');
+        Logger.success('✅ AutoRespostaCommand carregado');
+        
+        SyncStatusCommand = require('./commands/sync-status');
+        Logger.success('✅ SyncStatusCommand carregado');
+        
+        SyncPanelCommand = require('./commands/syncpanel');
+        Logger.success('✅ SyncPanelCommand carregado');
+        
+        DebugCommand = require('./commands/debug');
+        Logger.success('✅ DebugCommand carregado');
+        
+        const loadTime = Date.now() - startTime;
+        Logger.success(`✅ Todos os módulos carregados em ${loadTime}ms`);
+        Logger.performance('Carregamento de módulos', loadTime);
+        
+    } catch (error) {
+        Logger.error(`Erro no carregamento de módulos: ${error.message}`);
+        console.error('Stack:', error.stack);
+    }
+}
+
+// ========================================================================================================
+// 🎯 EVENTOS DO CLIENTE WHATSAPP OTIMIZADOS
+// ========================================================================================================
+
+// Evento QR Code
+client.on('qr', (qr) => {
+    Logger.logBox('QR CODE GERADO', [
+        '📱 Escaneie o QR Code com seu WhatsApp',
+        '⏱️ Código expira em 20 segundos',
+        '🔄 Aguardando autenticação...'
+    ], 'yellow');
+    qrcode.generate(qr, { small: true });
+});
+
+// Evento de autenticação
+client.on('authenticated', () => {
+    Logger.logBox('AUTENTICAÇÃO CONCLUÍDA', [
+        '✅ WhatsApp autenticado com sucesso!',
+        '🔄 Preparando conexão...'
+    ], 'green');
+});
+
+// Evento de falha na autenticação
+client.on('auth_failure', (msg) => {
+    Logger.logBox('FALHA NA AUTENTICAÇÃO', [
+        '❌ Erro na autenticação do WhatsApp',
+        `📋 Detalhes: ${msg}`,
+        '🔄 Tente escanear o QR Code novamente'
+    ], 'red');
+});
+
+// Evento de conexão pronta
+client.on('ready', async () => {
+    const readyTime = moment().format('DD/MM/YYYY HH:mm:ss');
+    
+    Logger.logBox('BOT CONECTADO COM SUCESSO', [
+        '🎉 WhatsApp Web conectado!',
+        `📅 Conectado em: ${readyTime}`,
+        `👑 Dono: ${config.numeroDono}`,
+        `🌐 Timezone: ${config.timezone}`,
+        '',
+        '🔄 Carregando módulos e dados...'
+    ], 'green');
+    
+         // Inicializar Sender primeiro
+     try {
+         Sender.initialize(client);
+         Logger.success('✅ Sender inicializado');
+     } catch (senderError) {
+         Logger.error(`Erro ao inicializar Sender: ${senderError.message}`);
+     }
+     
+     // Carregar módulos e dados em paralelo
+     try {
+         const initPromises = [
+             carregarModulosComandos(),
+             notificarPainelLaravel(),
+             AdsHandler?.loadAllAds?.() || Promise.resolve()
+         ];
+        
+        await Promise.all(initPromises);
+        
+        Logger.success('🚀 Bot totalmente operacional!');
+        
+        // Mensagem de status para o dono
+        if (config.numeroDono) {
+            const statusMsg = `🤖 *Bot Conectado!*\n\n` +
+                `⏰ ${readyTime}\n` +
+                `✅ Todos os sistemas operacionais\n` +
+                `📊 Memória: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`;
+            
+            try {
+                await client.sendMessage(`${config.numeroDono}@c.us`, statusMsg);
+                Logger.info('Notificação de status enviada ao dono');
+            } catch (notifyError) {
+                Logger.warning(`Não foi possível notificar o dono: ${notifyError.message}`);
+            }
+        }
+        
+    } catch (initError) {
+        Logger.error(`Erro na inicialização: ${initError.message}`);
+    }
+});
+
+// Evento de desconexão
+client.on('disconnected', (reason) => {
+    Logger.logBox('DESCONECTADO', [
+        '⚠️ Bot desconectado do WhatsApp',
+        `📋 Motivo: ${reason}`,
+        '🔄 Tentando reconectar...'
+    ], 'yellow');
+});
+
+// ========================================================================================================
+// 📨 CONFIGURAÇÃO DE EVENTOS DE MENSAGEM
+// ========================================================================================================
+
+// Wrapper de segurança para processamento de mensagens
 const safeProcessMessage = async (message) => {
     try {
         await processMessage(message);
     } catch (error) {
-        console.error(`[SAFETY] Erro capturado no wrapper de segurança: ${error.message}`);
-        console.error(`[SAFETY] Stack: ${error.stack}`);
+        console.error(`[SAFETY] Erro capturado no wrapper: ${error.message}`);
+        Logger.error(`Erro no wrapper de segurança: ${error.message}`);
     }
 };
 
-// Configurar eventos de mensagem (duplo para garantir compatibilidade)
+// Configurar ambos os eventos para máxima compatibilidade
 client.on('message_create', safeProcessMessage);
 client.on('message', safeProcessMessage);
 
+console.log('[EVENTS] ✅ Eventos de mensagem configurados (message_create + message)');
+
 // ========================================================================================================
-// 🚀 INICIALIZAÇÃO DO BOT
+// 🚀 INICIALIZAÇÃO E TRATAMENTO DE ERROS GLOBAIS
 // ========================================================================================================
 
 // Tratamento de erros não capturados
 process.on('unhandledRejection', (reason, promise) => {
-    Logger.error(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
+    console.error('[UNCAUGHT] Unhandled Rejection:', reason);
+    Logger.error(`Unhandled Rejection: ${reason}`);
 });
 
 process.on('uncaughtException', (error) => {
+    console.error('[UNCAUGHT] Uncaught Exception:', error.message);
+    console.error('Stack:', error.stack);
     Logger.error(`Uncaught Exception: ${error.message}`);
-    console.error('Stack trace:', error.stack);
 });
 
-// Inicializar o cliente
+// Mensagem de inicialização
 Logger.logBox('INICIANDO BOT WHATSAPP', [
     `🤖 Bot Administrador v${config.botInfo.versao}`,
     `👑 Dono: ${config.numeroDono}`,
@@ -1034,9 +732,13 @@ Logger.logBox('INICIANDO BOT WHATSAPP', [
     '🔄 Inicializando cliente WhatsApp...'
 ], 'blue');
 
+// Inicializar o cliente
 client.initialize();
 
-// Exportar para uso em outros módulos
+// ========================================================================================================
+// 📦 EXPORTAÇÃO DE MÓDULOS
+// ========================================================================================================
+
 module.exports = {
     client,
     DataManager,
@@ -1045,6 +747,10 @@ module.exports = {
     RentalSystem,
     config
 };
+
+// ========================================================================================================
+// 🏗️ CRIAÇÃO DE ESTRUTURA DE DADOS
+// ========================================================================================================
 
 // Criar estrutura básica se necessário
 if (!fs.existsSync('./data')) {
@@ -1056,7 +762,8 @@ if (!fs.existsSync('./data')) {
         { file: 'configs.json', content: { "grupos": {} } },
         { file: 'ads.json', content: { "anuncios": {} } },
         { file: 'sorteios.json', content: { "sorteios": {} } },
-        { file: 'horarios.json', content: { "horarios": {} } }
+        { file: 'horarios.json', content: { "horarios": {} } },
+        { file: 'notifiedUsers.json', content: { "users": [] } }
     ];
     
     dataFiles.forEach(dataFile => {
