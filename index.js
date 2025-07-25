@@ -602,20 +602,34 @@ client.on('disconnected', (reason) => {
 // 📨 PROCESSAMENTO DE MENSAGENS OTIMIZADO
 // ========================================================================================================
 
-// Função para processar mensagens (unificada)
+// Função para processar mensagens (unificada) - Versão 2.1 com correções críticas
 async function processMessage(message) {
     try {
         const startTime = Date.now();
         
+        // Validação básica da mensagem
+        if (!message || !message.from) {
+            console.log(`[DEBUG] Mensagem inválida ou sem origem - ignorando`);
+            return;
+        }
+        
         // Ignorar mensagens do próprio bot
-        if (message.fromMe) return;
+        if (message.fromMe) {
+            console.log(`[DEBUG] Mensagem própria ignorada`);
+            return;
+        }
         
         // Debug log para verificar se mensagens estão chegando
-        console.log(`[DEBUG] Mensagem recebida de: ${message.from}, corpo: "${message.body?.substring(0, 50)}..."`);
+        console.log(`[DEBUG] ✅ Mensagem recebida de: ${message.from}, corpo: "${message.body?.substring(0, 50) || 'sem corpo'}..."`);
 
         // Verificar se é mensagem privada
         if (!message.from.includes('@g.us')) {
-            await handlePrivateMessage(client, message);
+            console.log(`[DEBUG] Processando mensagem privada`);
+            try {
+                await handlePrivateMessage(client, message);
+            } catch (privateError) {
+                console.error(`[DEBUG] Erro ao processar mensagem privada: ${privateError.message}`);
+            }
             return;
         }
 
@@ -634,12 +648,22 @@ async function processMessage(message) {
         Logger.command(Utils.getUsername(message), `${config.prefix}${command}`, Utils.getGroupName(groupId));
 
         // Verificar status do grupo (otimizado com cache)
-        const groupStatus = await RentalSystem.checkGroupStatus(groupId);
-        console.log(`[DEBUG] Status do grupo ${groupId}: ${groupStatus.active ? 'ATIVO' : 'INATIVO'} - Razão: ${groupStatus.reason}`);
+        let groupStatus;
+        try {
+            groupStatus = await RentalSystem.checkGroupStatus(groupId);
+            console.log(`[DEBUG] Status do grupo ${groupId}: ${groupStatus.active ? 'ATIVO' : 'INATIVO'} - Razão: ${groupStatus.reason || 'N/A'}`);
+        } catch (statusError) {
+            console.error(`[DEBUG] Erro ao verificar status do grupo: ${statusError.message} - Permitindo acesso temporário`);
+            groupStatus = { active: true, reason: 'Erro na verificação - acesso temporário' };
+        }
         
         if (!groupStatus.active && !Utils.isOwner(message)) {
-            console.log(`[DEBUG] Grupo bloqueado - enviando mensagem de erro`);
-            await message.reply(groupStatus.message);
+            console.log(`[DEBUG] Grupo bloqueado - tentando enviar mensagem de erro`);
+            try {
+                await message.reply(groupStatus.message || '❌ Grupo temporariamente indisponível');
+            } catch (replyError) {
+                console.error(`[DEBUG] Erro ao enviar resposta de grupo bloqueado: ${replyError.message}`);
+            }
             return;
         }
 
@@ -991,20 +1015,44 @@ async function processMessage(message) {
         }
 
     } catch (error) {
+        const duration = Date.now() - startTime;
+        console.error(`[DEBUG] 💥 ERRO CRÍTICO no processMessage (${duration}ms):`);
+        console.error(`[DEBUG] Mensagem de: ${message?.from || 'UNKNOWN'}`);
+        console.error(`[DEBUG] Corpo: "${message?.body?.substring(0, 100) || 'EMPTY'}"`);
+        console.error(`[DEBUG] Erro: ${error.message}`);
+        console.error(`[DEBUG] Stack: ${error.stack}`);
+        
+        // Verificar se é o erro validateAndGetParts
+        if (error.message.includes('validateAndGetParts') || error.stack?.includes('validateAndGetParts')) {
+            console.error(`[DEBUG] 🔧 ERRO validateAndGetParts DETECTADO - Este é o erro principal!`);
+        }
+        
         Logger.error(`Erro crítico ao processar mensagem: ${error.message}`);
-        console.error('Stack trace:', error.stack);
         
         try {
-            await message.reply('❌ *Erro interno do sistema*\n\n🔧 Tente novamente em alguns segundos.\n📞 Se o problema persistir, contate o suporte.');
+            if (message && message.reply && typeof message.reply === 'function') {
+                await message.reply('❌ *Erro interno do sistema*\n\n🔧 Tente novamente em alguns segundos.\n📞 Se o problema persistir, contate o suporte.');
+            }
         } catch (replyError) {
+            console.error(`[DEBUG] Não foi possível enviar resposta de erro: ${replyError.message}`);
             Logger.error(`Erro ao enviar mensagem de erro: ${replyError.message}`);
         }
     }
 }
 
+// Configurar eventos de mensagem com wrapper de segurança
+const safeProcessMessage = async (message) => {
+    try {
+        await processMessage(message);
+    } catch (error) {
+        console.error(`[SAFETY] Erro capturado no wrapper de segurança: ${error.message}`);
+        console.error(`[SAFETY] Stack: ${error.stack}`);
+    }
+};
+
 // Configurar eventos de mensagem (duplo para garantir compatibilidade)
-client.on('message_create', processMessage);
-client.on('message', processMessage);
+client.on('message_create', safeProcessMessage);
+client.on('message', safeProcessMessage);
 
 // ========================================================================================================
 // 🚀 INICIALIZAÇÃO DO BOT
