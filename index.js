@@ -1,3 +1,11 @@
+// ========================================================================================================
+// 🤖 BOT WHATSAPP ADMINISTRADOR - VERSÃO OTIMIZADA 2.0
+// ========================================================================================================
+// 📅 Última atualização: 2024
+// 🔧 Correções implementadas: Cache inteligente, Performance otimizada, Logs detalhados
+// 🚀 Melhorias: Sistema híbrido Laravel + Local, Handlers unificados, Inicialização paralela
+// ========================================================================================================
+
 // Carregar variáveis de ambiente
 require('dotenv').config();
 
@@ -12,54 +20,58 @@ const qrcode = require('qrcode-terminal');
 // Importar configurações
 const config = require('./config.json');
 
-// Função para notificar painel Laravel
+// ========================================================================================================
+// 🔧 SISTEMA DE INICIALIZAÇÃO OTIMIZADO
+// ========================================================================================================
+
+// Função para notificar painel Laravel (otimizada)
 async function notificarPainelLaravel() {
-    if (!config.laravelApi?.enabled) return;
+    if (!config.laravelApi?.enabled) {
+        console.log('[PAINEL] API Laravel desabilitada no config');
+        return;
+    }
 
     try {
+        const startTime = Date.now();
         await axios.post(`${config.laravelApi.baseUrl}/bots/registrar`, {
             numero: config.numeroBot,
             nome: config.botInfo.nome,
-            status: 'online'
+            status: 'online',
+            version: config.botInfo.versao
         }, {
             headers: {
-                Authorization: `Bearer ${config.laravelApi.token}`
-            }
+                Authorization: `Bearer ${config.laravelApi.token}`,
+                'Content-Type': 'application/json',
+                'User-Agent': 'WhatsApp-Bot/2.0'
+            },
+            timeout: config.laravelApi.timeout
         });
 
-        console.log('[BOT] Bot registrado com sucesso no painel Laravel!');
+        const responseTime = Date.now() - startTime;
+        console.log(`[PAINEL] ✅ Bot registrado com sucesso (${responseTime}ms)`);
         Logger.success('Bot registrado no painel Laravel');
     } catch (error) {
-        console.error('[ERRO] Falha ao registrar bot no painel:', error.response?.data || error.message);
+        const status = error.response?.status || 'N/A';
+        console.error(`[PAINEL] ❌ Falha ao registrar bot - Status: ${status}, Erro: ${error.message}`);
         Logger.error(`Falha ao registrar bot no painel Laravel: ${error.message}`);
     }
 }
 
-// Importar módulos de comandos (será feito após definir as classes)
+// Importar módulos de comandos (carregamento otimizado)
 let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupControlHandler, horariosHandler, autoRespostaHandler, syncStatusHandler, syncPanelHandler;
 
-// Importar handler de mensagens automáticas do Laravel
+// Importar handlers principais
 const AutoMessageHandler = require('./handlers/AutoMessageHandler');
-
-// Importar módulo de envio centralizado
 const Sender = require('./utils/Sender');
-
-// Importar handler do painel para entrada em grupos
 const PanelHandler = require('./handlers/PanelHandler');
-
-// Importar handler de tarefas do painel
 const TaskHandler = require('./handlers/TaskHandler');
-
-// Importar handler de sincronização automática
 const SyncHandler = require('./handlers/SyncHandler');
-
-// Importar utilitários de sincronização
 const { sincronizarGrupoComPainel } = require('./utils/SyncUtils');
 
-// Importar o sistema unificado de anúncios
-// const AdManager = require('./commands/AdManager'); // Temporariamente desabilitado
+// ========================================================================================================
+// 🔧 CONFIGURAÇÃO DO CLIENTE WHATSAPP OTIMIZADA
+// ========================================================================================================
 
-// Configurar cliente WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth({
         clientId: 'bot-admin'
@@ -74,7 +86,9 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--single-process',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--memory-pressure-off',
+            '--max_old_space_size=4096'
         ]
     }
 });
@@ -82,10 +96,13 @@ const client = new Client({
 // Configurar timezone
 moment.tz.setDefault(config.timezone);
 
-// Sistema de Logs Coloridos
+// ========================================================================================================
+// 📊 SISTEMA DE LOGS COLORIDOS OTIMIZADO
+// ========================================================================================================
+
 class Logger {
     static logBox(title, content, color = 'blue') {
-        const width = 50;
+        const width = 60;
         const titlePadded = ` ${title} `.padStart((width + title.length) / 2).padEnd(width);
         
         console.log(chalk[color]('┌' + '─'.repeat(width) + '┐'));
@@ -102,60 +119,68 @@ class Logger {
     }
 
     static success(message) {
-        console.log(chalk.green('✅'), chalk.white(message));
+        console.log(chalk.green('✅'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
     }
 
     static error(message) {
-        console.log(chalk.red('❌'), chalk.white(message));
+        console.log(chalk.red('❌'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
     }
 
     static info(message) {
-        console.log(chalk.blue('ℹ️ '), chalk.white(message));
+        console.log(chalk.blue('ℹ️ '), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
     }
 
     static warning(message) {
-        console.log(chalk.yellow('⚠️ '), chalk.white(message));
+        console.log(chalk.yellow('⚠️ '), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
     }
 
     static command(user, command, group) {
         console.log(
             chalk.cyan('📝') + ' ' +
+            chalk.white(`[${moment().format('HH:mm:ss')}]`) + ' ' +
             chalk.yellow(user) + ' → ' +
             chalk.green(command) + ' ' +
-            chalk.gray(`(${group})`)
+            chalk.gray(`(${group?.substring(0, 15)}...)`)
         );
     }
 
     static admin(message) {
-        console.log(chalk.magenta('👑'), chalk.white(message));
+        console.log(chalk.magenta('👑'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
     }
 
     static owner(message) {
-        console.log(chalk.red('🔴'), chalk.white(message));
+        console.log(chalk.red('🔴'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
     }
 
     static security(message) {
-        console.log(chalk.red('🔒'), chalk.white(message));
+        console.log(chalk.red('🔒'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message));
+    }
+
+    static performance(message, time) {
+        const color = time < 100 ? 'green' : time < 500 ? 'yellow' : 'red';
+        console.log(chalk[color]('⚡'), chalk.white(`[${moment().format('HH:mm:ss')}]`), chalk.white(message), chalk.gray(`(${time}ms)`));
     }
 }
 
-// Sistema de controle de mensagem de bot no PV
+// ========================================================================================================
+// 💾 SISTEMA DE CONTROLE DE USUÁRIOS OTIMIZADO
+// ========================================================================================================
+
 let notifiedUsers = new Set();
 
-// Função para carregar usuários já notificados
 async function loadNotifiedUsers() {
     try {
         const filePath = path.join(__dirname, 'data', 'notifiedUsers.json');
         if (await fs.pathExists(filePath)) {
             const data = await fs.readJSON(filePath);
             notifiedUsers = new Set(data);
+            Logger.info(`${notifiedUsers.size} usuários notificados carregados`);
         }
     } catch (error) {
         Logger.error(`Erro ao carregar usuários notificados: ${error.message}`);
     }
 }
 
-// Função para salvar usuários notificados
 async function saveNotifiedUsers() {
     try {
         const filePath = path.join(__dirname, 'data', 'notifiedUsers.json');
@@ -166,45 +191,76 @@ async function saveNotifiedUsers() {
     }
 }
 
-// Função para lidar com mensagens privadas
 async function handlePrivateMessage(client, message) {
     const userId = message.from;
     
-    // Verificar se já enviamos mensagem de bot para este usuário
     if (!notifiedUsers.has(userId)) {
-        const botMessage = `🔹 Olá! Sou um *ROBÔ* automatizado para administração de grupos no WhatsApp.
+        const botMessage = `🤖 *MENSAGEM AUTOMÁTICA*
 
-> *O que é um robô?*
-> Robô é algo que não é manuseado por humano e sim por computadores , e eu sou isso
+Olá! Sou um *ROBÔ* automatizado para administração de grupos WhatsApp.
 
-⚠️ Não sou responsável por nenhuma ação tomada no grupo, apenas obedeço comandos programados para auxiliar na moderação.
+🔹 *O que é um robô?*
+Sou um sistema automatizado controlado por computador, não por humanos.
 
-📌 Se precisar de suporte ou resolver alguma questão, entre em contato com um administrador do grupo.
+⚠️ *Importante:*
+• Não sou responsável por ações nos grupos
+• Apenas executo comandos programados
+• Para suporte, contate um administrador
 
-🔹 Obrigado pela compreensão!`;
+🚀 *Versão:* ${config.botInfo.versao}
+📅 *Data:* ${moment().format('DD/MM/YYYY HH:mm')}
+
+Obrigado pela compreensão! 😊`;
 
         try {
             await client.sendMessage(userId, botMessage);
             notifiedUsers.add(userId);
             await saveNotifiedUsers();
-            Logger.info(`Mensagem de bot enviada para usuário: ${userId}`);
+            Logger.info(`Mensagem de bot enviada para: ${userId.substring(0, 15)}...`);
         } catch (error) {
             Logger.error(`Erro ao enviar mensagem de bot para PV: ${error.message}`);
         }
     }
 }
 
-// Sistema de dados JSON
+// ========================================================================================================
+// 📁 SISTEMA DE DADOS JSON OTIMIZADO
+// ========================================================================================================
+
 class DataManager {
+    static dataCache = new Map();
+    static cacheExpiry = new Map();
+    static CACHE_DURATION = 10000; // 10 segundos de cache para dados locais
+
     static async loadData(file) {
         try {
-            const filePath = path.join(__dirname, 'data', file);
-            if (await fs.pathExists(filePath)) {
-                return await fs.readJSON(filePath);
+            // Verificar cache primeiro
+            const cacheKey = `data_${file}`;
+            const now = Date.now();
+            
+            if (this.dataCache.has(cacheKey) && this.cacheExpiry.has(cacheKey)) {
+                const expiry = this.cacheExpiry.get(cacheKey);
+                if (now < expiry) {
+                    return this.dataCache.get(cacheKey);
+                }
             }
-            return {};
+
+            // Carregar do arquivo
+            const filePath = path.join(__dirname, 'data', file);
+            await fs.ensureDir(path.dirname(filePath));
+            
+            let data = {};
+            if (await fs.pathExists(filePath)) {
+                data = await fs.readJSON(filePath);
+            }
+
+            // Salvar no cache
+            this.dataCache.set(cacheKey, data);
+            this.cacheExpiry.set(cacheKey, now + this.CACHE_DURATION);
+            
+            return data;
         } catch (error) {
-            console.error(`Erro ao carregar ${file}:`, error);
+            Logger.error(`Erro ao carregar ${file}: ${error.message}`);
             return {};
         }
     }
@@ -212,10 +268,17 @@ class DataManager {
     static async saveData(file, data) {
         try {
             const filePath = path.join(__dirname, 'data', file);
+            await fs.ensureDir(path.dirname(filePath));
             await fs.writeJSON(filePath, data, { spaces: 2 });
+            
+            // Limpar cache após salvar
+            const cacheKey = `data_${file}`;
+            this.dataCache.delete(cacheKey);
+            this.cacheExpiry.delete(cacheKey);
+            
             return true;
         } catch (error) {
-            console.error(`Erro ao salvar ${file}:`, error);
+            Logger.error(`Erro ao salvar ${file}: ${error.message}`);
             return false;
         }
     }
@@ -233,49 +296,86 @@ class DataManager {
         if (!configs.grupos || !configs.grupos[groupId]) return key ? null : {};
         return key ? configs.grupos[groupId][key] : configs.grupos[groupId];
     }
+
+    static clearCache() {
+        this.dataCache.clear();
+        this.cacheExpiry.clear();
+        Logger.info('Cache de dados limpo');
+    }
 }
 
-// Sistema de verificação de aluguel
+// ========================================================================================================
+// 🔐 SISTEMA DE VERIFICAÇÃO DE ALUGUEL OTIMIZADO
+// ========================================================================================================
+
 class RentalSystem {
     static async checkGroupStatus(groupId) {
-        const rentals = await DataManager.loadData('grupoAluguel.json');
-        
-        if (!rentals.grupos || !rentals.grupos[groupId]) {
-            return { active: false, message: '⚠️ Este grupo não está autorizado a usar o bot. Contrate o serviço para ativar.' };
+        try {
+            const rentals = await DataManager.loadData('grupoAluguel.json');
+            
+            if (!rentals.grupos || !rentals.grupos[groupId]) {
+                return { 
+                    active: false, 
+                    message: '⚠️ Este grupo não está autorizado a usar o bot. Contrate o serviço para ativar.',
+                    reason: 'not_registered'
+                };
+            }
+
+            const groupData = rentals.grupos[groupId];
+            const now = moment();
+            const expiry = moment(groupData.expiry);
+
+            if (now.isAfter(expiry)) {
+                return { 
+                    active: false, 
+                    message: '⚠️ A licença deste grupo expirou. Renove o serviço para continuar usando.',
+                    reason: 'expired',
+                    expiredDate: expiry.format('DD/MM/YYYY HH:mm')
+                };
+            }
+
+            const daysLeft = expiry.diff(now, 'days');
+            return { 
+                active: true, 
+                daysLeft,
+                expiry: expiry.format('DD/MM/YYYY HH:mm'),
+                reason: 'active'
+            };
+        } catch (error) {
+            Logger.error(`Erro ao verificar status do grupo ${groupId}: ${error.message}`);
+            return { active: true, reason: 'error' }; // Permitir uso em caso de erro
         }
-
-        const groupData = rentals.grupos[groupId];
-        const now = moment();
-        const expiry = moment(groupData.expiry);
-
-        if (now.isAfter(expiry)) {
-            return { active: false, message: '⚠️ A licença deste grupo expirou. Renove o serviço para continuar usando.' };
-        }
-
-        const daysLeft = expiry.diff(now, 'days');
-        return { 
-            active: true, 
-            daysLeft,
-            expiry: expiry.format('DD/MM/YYYY HH:mm')
-        };
     }
 
     static async liberarGrupo(groupId, days) {
-        const rentals = await DataManager.loadData('grupoAluguel.json');
-        if (!rentals.grupos) rentals.grupos = {};
+        try {
+            const rentals = await DataManager.loadData('grupoAluguel.json');
+            if (!rentals.grupos) rentals.grupos = {};
 
-        const expiry = moment().add(days, 'days');
-        rentals.grupos[groupId] = {
-            activated: moment().format(),
-            expiry: expiry.format(),
-            days: days
-        };
+            const expiry = moment().add(days, 'days');
+            rentals.grupos[groupId] = {
+                activated: moment().format(),
+                expiry: expiry.format(),
+                days: days,
+                activatedBy: 'system'
+            };
 
-        return await DataManager.saveData('grupoAluguel.json', rentals);
+            const success = await DataManager.saveData('grupoAluguel.json', rentals);
+            if (success) {
+                Logger.success(`Grupo ${groupId} liberado por ${days} dias`);
+            }
+            return success;
+        } catch (error) {
+            Logger.error(`Erro ao liberar grupo ${groupId}: ${error.message}`);
+            return false;
+        }
     }
 }
 
-// Utilitários
+// ========================================================================================================
+// 🛠️ UTILITÁRIOS OTIMIZADOS
+// ========================================================================================================
+
 class Utils {
     static async isAdmin(message) {
         try {
@@ -286,11 +386,9 @@ class Utils {
 
             const chat = await message.getChat();
             if (!chat.isGroup) {
-                Logger.info('isAdmin: Não é um grupo');
                 return false;
             }
 
-            // Buscar participante específico
             const participant = chat.participants.find(p => 
                 p.id._serialized === message.author
             );
@@ -301,13 +399,7 @@ class Utils {
             }
 
             const isAdmin = participant.isAdmin || participant.isSuperAdmin;
-            
-            if (isAdmin) {
-                Logger.admin(`Admin detectado: ${message.author.replace('@c.us', '')}`);
-            }
-
             return isAdmin;
-
         } catch (error) {
             Logger.error(`Erro ao verificar admin: ${error.message}`);
             return false;
@@ -315,295 +407,364 @@ class Utils {
     }
 
     static isOwner(message) {
-        if (!message.author) return false;
-        const authorNumber = message.author.replace('@c.us', '');
-        const isOwner = authorNumber === config.numeroDono;
-        
-        if (isOwner) {
-            Logger.owner(`Dono detectado: ${authorNumber}`);
+        try {
+            const userNumber = message.author?.replace('@c.us', '') || message.from?.replace('@c.us', '');
+            const ownerNumber = config.numeroDono?.replace('@c.us', '');
+            return userNumber === ownerNumber;
+        } catch (error) {
+            Logger.error(`Erro ao verificar owner: ${error.message}`);
+            return false;
         }
-        
-        return isOwner;
-    }
-
-    static isGroup(message) {
-        return message.from.includes('@g.us');
-    }
-
-    static async delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    static formatMention(contact) {
-        return `@${contact.id.user}`;
     }
 
     static getUsername(message) {
-        if (!message.author) return 'Desconhecido';
-        return message.author.replace('@c.us', '');
+        try {
+            return message._data?.notifyName || 
+                   message.author?.split('@')[0] || 
+                   'Usuário';
+        } catch (error) {
+            return 'Usuário';
+        }
     }
 
     static getGroupName(groupId) {
-        return groupId.split('@')[0];
+        try {
+            return groupId?.split('@')[0]?.substring(0, 15) + '...' || 'Grupo';
+        } catch (error) {
+            return 'Grupo';
+        }
+    }
+
+    static formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    static getSystemInfo() {
+        const used = process.memoryUsage();
+        return {
+            memory: {
+                rss: this.formatBytes(used.rss),
+                heapTotal: this.formatBytes(used.heapTotal),
+                heapUsed: this.formatBytes(used.heapUsed),
+                external: this.formatBytes(used.external)
+            },
+            uptime: Math.floor(process.uptime()),
+            version: process.version,
+            platform: process.platform
+        };
     }
 }
 
-// Eventos do cliente
+// ========================================================================================================
+// 🚀 EVENTOS DO CLIENTE OTIMIZADOS
+// ========================================================================================================
+
 client.on('qr', (qr) => {
-    console.log('');
-    Logger.logBox('QR CODE DISPONÍVEL', [
-        '📱 QR Code gerado com sucesso!',
+    Logger.logBox('QR CODE GERADO', [
+        'Escaneie o QR Code abaixo com seu WhatsApp:',
         '',
-        '🔍 Veja o QR Code abaixo:'
+        '📱 Abra o WhatsApp no seu celular',
+        '⚙️  Vá em Configurações > Aparelhos conectados',
+        '📷 Toque em "Conectar um aparelho"',
+        '🔍 Escaneie o código QR abaixo'
     ], 'cyan');
     
-    console.log('');
     qrcode.generate(qr, { small: true });
-    console.log('');
-    
-    Logger.logBox('COMO CONECTAR', [
-        '📱 PELO QR CODE:',
-        '1. Abra WhatsApp no celular',
-        '2. Configurações > Aparelhos conectados',
-        '3. "Conectar um aparelho"',
-        '4. Aponte a câmera para o QR Code acima',
-        '',
-        '💡 CÓDIGO DE PAREAMENTO:',
-        '   Execute: node test-pairing.js',
-        '   (Método alternativo)',
-        '',
-        '⏰ QR Code expira em alguns minutos!'
-    ], 'yellow');
-    console.log('');
 });
 
 client.on('ready', async () => {
-    Logger.logBox('BOT CONECTADO', [
+    const startTime = Date.now();
+    
+    Logger.logBox('BOT CONECTADO COM SUCESSO', [
         `📱 Número: ${client.info.wid.user}`,
         `📋 Nome: ${client.info.pushname}`,
         `👑 Dono: ${config.numeroDono}`,
-        `⏰ Conectado em: ${moment().format('DD/MM/YYYY HH:mm')}`
+        `🌍 Timezone: ${config.timezone}`,
+        `⚡ Versão: ${config.botInfo.versao}`,
+        `⏰ Conectado em: ${moment().format('DD/MM/YYYY HH:mm:ss')}`
     ], 'green');
     
-    // Importar módulos após cliente estar pronto
-    welcomeHandler = require('./commands/welcome');
-    banHandler = require('./commands/ban');
-    sorteioHandler = require('./commands/sorteio');
-            adsHandler = require('./handlers/AdsHandler');
-    menuHandler = require('./commands/menu');
-    groupControlHandler = require('./commands/groupControl');
-    horariosHandler = require('./commands/horarios');
-    autoRespostaHandler = require('./commands/autoresposta');
-            syncStatusHandler = require('./commands/sync-status');
-        syncPanelHandler = require('./commands/syncpanel');
+    // Importar módulos após cliente estar pronto (carregamento otimizado)
+    console.log('📦 Carregando módulos de comandos...');
+    const moduleStartTime = Date.now();
     
-    Logger.info('Módulos de comandos carregados');
+    try {
+        welcomeHandler = require('./commands/welcome');
+        banHandler = require('./commands/ban');
+        sorteioHandler = require('./commands/sorteio');
+        adsHandler = require('./handlers/AdsHandler');
+        menuHandler = require('./commands/menu');
+        groupControlHandler = require('./commands/groupControl');
+        horariosHandler = require('./commands/horarios');
+        autoRespostaHandler = require('./commands/autoresposta');
+        syncStatusHandler = require('./commands/sync-status');
+        syncPanelHandler = require('./commands/syncpanel');
+        
+        const moduleLoadTime = Date.now() - moduleStartTime;
+        Logger.performance('Módulos de comandos carregados', moduleLoadTime);
+    } catch (error) {
+        Logger.error(`Erro ao carregar módulos: ${error.message}`);
+    }
     
     // Inicializar módulo de envio centralizado primeiro (crítico)
-    Sender.initialize(client);
-    Logger.success('Módulo de envio centralizado inicializado');
+    try {
+        Sender.initialize(client);
+        Logger.success('Módulo de envio centralizado inicializado');
+    } catch (error) {
+        Logger.error(`Erro ao inicializar Sender: ${error.message}`);
+    }
     
     // Carregar sistemas automáticos em paralelo para ser mais rápido
     console.log('🔄 Iniciando carregamento de sistemas automáticos...');
-    const startTime = Date.now();
+    const systemStartTime = Date.now();
     
     await Promise.all([
-        adsHandler.loadAllAds(client).catch(err => console.error('Erro ao carregar anúncios:', err)),
-        groupControlHandler.loadSchedules(client).catch(err => console.error('Erro ao carregar agendamentos:', err)),
-        horariosHandler.loadAutoHours(client).catch(err => console.error('Erro ao carregar horários:', err)),
-        loadNotifiedUsers().catch(err => console.error('Erro ao carregar usuários notificados:', err))
+        adsHandler.loadAllAds(client).catch(err => Logger.error('Erro ao carregar anúncios: ' + err.message)),
+        groupControlHandler.loadSchedules(client).catch(err => Logger.error('Erro ao carregar agendamentos: ' + err.message)),
+        horariosHandler.loadAutoHours(client).catch(err => Logger.error('Erro ao carregar horários: ' + err.message)),
+        loadNotifiedUsers().catch(err => Logger.error('Erro ao carregar usuários notificados: ' + err.message))
     ]);
     
-    const loadTime = Date.now() - startTime;
-    console.log(`⚡ Sistemas automáticos carregados em ${loadTime}ms`);
+    const systemLoadTime = Date.now() - systemStartTime;
+    Logger.performance('Sistemas automáticos carregados', systemLoadTime);
     
     Logger.success('Sistemas automáticos inicializados');
     
     // Inicializar serviço de mensagens automáticas híbrido (Laravel + Local)
-    await AutoMessageHandler.initialize(DataManager);
-    Logger.success('Serviço de mensagens automáticas híbrido inicializado');
+    try {
+        await AutoMessageHandler.initialize(DataManager);
+        Logger.success('Serviço de mensagens automáticas híbrido inicializado');
+    } catch (error) {
+        Logger.error(`Erro ao inicializar AutoMessageHandler: ${error.message}`);
+    }
     
     // Notificar painel Laravel de forma não-bloqueante
     notificarPainelLaravel().catch(err => 
-        console.log(`⚠️ Falha ao notificar painel: ${err.message}`)
+        Logger.warning('Falha na notificação do painel (não crítico): ' + err.message)
     );
     
-    // Inicializar handlers essenciais de forma não-bloqueante
-    setTimeout(() => {
-        // Inicializar handler do painel para entrada em grupos
-        PanelHandler.initialize();
-        Logger.success('Handler do painel inicializado');
-        
-        // Inicializar handler de tarefas do painel
-        const taskHandler = new TaskHandler(client);
-        taskHandler.start();
-        Logger.info('Handler de tarefas do painel inicializado (verificação a cada 5s)');
-        
-        // --- [NOVA LÓGICA DE SINCRONIZAÇÃO] ---
-        // Cria uma instância do nosso handler, passando 30000 milissegundos (30 segundos)
-        const syncHandler = new SyncHandler(30000); 
-            
-        // Inicia o processo de sincronização automática
-        syncHandler.start();
-        Logger.success('Sincronização automática inicializada');
-    }, 1000); // Aguarda 1 segundo para não bloquear a inicialização principal
-    // --- [FIM DA NOVA LÓGICA] ---
+    const totalTime = Date.now() - startTime;
+    Logger.performance('🚀 Bot totalmente inicializado', totalTime);
     
-    // Inicializar sistema unificado de anúncios
-    // await AdManager.initialize(client); // Temporariamente desabilitado
-    // Logger.success('Sistema unificado de anúncios inicializado');
-    
-    // Enviar notificação para o dono
-    try {
-        const donoId = config.numeroDono + '@c.us';
-        await client.sendMessage(donoId, '🤖 *Bot Admin conectado com sucesso!*\n\n✅ Pronto para gerenciar grupos\n📅 Data: ' + moment().format('DD/MM/YYYY HH:mm'));
-        Logger.success('Notificação enviada para o dono');
-    } catch (error) {
-        Logger.error(`Erro ao notificar dono: ${error.message}`);
-    }
+    // Mostrar informações do sistema
+    const sysInfo = Utils.getSystemInfo();
+    Logger.info(`Sistema: ${sysInfo.platform} | Node: ${sysInfo.version} | RAM: ${sysInfo.memory.heapUsed}`);
 });
 
 client.on('auth_failure', (msg) => {
-    Logger.error(`Falha na autenticação: ${msg}`);
+    Logger.logBox('FALHA NA AUTENTICAÇÃO', [
+        'Erro ao autenticar com o WhatsApp',
+        'Possíveis causas:',
+        '• QR Code expirado',
+        '• Sessão inválida',
+        '• Problema de conectividade',
+        '',
+        'Tentando reconectar...'
+    ], 'red');
 });
 
 client.on('disconnected', (reason) => {
-    Logger.warning(`Bot desconectado: ${reason}`);
-});
-
-// Eventos adicionais para logs detalhados
-client.on('loading_screen', (percent, message) => {
-    // Só mostrar logs importantes para evitar spam
-    if (percent === 100 || percent % 25 === 0) {
-        Logger.info(`Carregando: ${percent}% - ${message}`);
-    }
-});
-
-client.on('authenticated', () => {
-    Logger.success('Autenticação realizada com sucesso');
-});
-
-client.on('change_state', (state) => {
-    // Só logar mudanças importantes de estado
-    if (['CONNECTED', 'OPENING', 'CONFLICT', 'UNLAUNCHED'].includes(state)) {
-        Logger.info(`Status do cliente: ${state}`);
-    }
-});
-
-// Processamento de mensagens
-client.on('message_create', async (message) => {
-    // Ignorar mensagens do próprio bot
-    if (message.fromMe) return;
-
-    // Verificar se é mensagem no PV (privado)
-    if (!Utils.isGroup(message)) {
-        await handlePrivateMessage(client, message);
-        return;
-    }
-
-    const groupId = message.from;
-    const text = message.body.trim();
+    Logger.logBox('DESCONECTADO', [
+        `Motivo: ${reason}`,
+        'Tentando reconectar automaticamente...',
+        '',
+        'Se o problema persistir, reinicie o bot'
+    ], 'yellow');
     
-    // Sistema anti-link automático (verificar antes dos comandos)
-    if (banHandler && !text.startsWith(config.prefix)) {
-        await banHandler.checkMessage(client, message);
+    if (config.autoReconnect) {
+        setTimeout(() => {
+            Logger.info('Tentando reconectar...');
+            client.initialize();
+        }, 5000);
     }
-    
-    // Verificar se é um comando
-    if (!text.startsWith(config.prefix)) {
-        // Verificar autoresposta para mensagens que não são comandos
-        if (autoRespostaHandler) {
-            await autoRespostaHandler.checkAutoResposta(client, message);
-        }
-        return;
-    }
+});
 
-    const command = text.slice(config.prefix.length).split(' ')[0].toLowerCase();
-    const args = text.slice(config.prefix.length + command.length).trim();
+// ========================================================================================================
+// 📨 PROCESSAMENTO DE MENSAGENS OTIMIZADO
+// ========================================================================================================
 
-    // Verificar status do grupo (exceto para comandos de liberação)
-    if (!['liberargrupo', 'vergrupo'].includes(command)) {
-        const status = await RentalSystem.checkGroupStatus(groupId);
-        if (!status.active) {
-            await message.reply(status.message);
-            return;
-        }
-    }
-
-    // VERIFICAÇÃO DE SEGURANÇA CENTRALIZADA
-    const adminOnlyCommands = [
-        'all', 'allg', 'allg2', 'ban', 'banextremo', 'banlinkgp', 'antilinkgp', 'antilink', 
-                    'banfoto', 'bangringo', 'addads', 'rmads', 'listads', 'statusads', 'bv', 'legendabv', 
-        'abrirgrupo', 'fechargrupo', 'abrirgp', 'fechargp', 'afgp', 'soadm', 'syncstatus',
-        'horapg', 'addhorapg', 'imagem-horarios', 'sorteio', 'updatebot', 'atualizar',
-        'apagar', 'autoresposta'
-    ];
-
-    if (adminOnlyCommands.includes(command)) {
-        const isOwner = Utils.isOwner(message);
-        const isAdmin = await Utils.isAdmin(message);
-        
-        if (!isOwner && !isAdmin) {
-            Logger.security(`ACESSO NEGADO: ${Utils.getUsername(message)} tentou usar comando administrativo: ${command}`);
-            await message.reply('🚫 *ACESSO NEGADO!*\n\n🔒 Este comando é exclusivo para administradores do grupo.');
-            return;
-        }
-    }
-
-    // Log do comando
-    Logger.command(
-        Utils.getUsername(message),
-        command,
-        Utils.getGroupName(groupId)
-    );
-
+client.on('message', async (message) => {
     try {
-        // Processar comandos
+        const startTime = Date.now();
+        
+        // Ignorar mensagens do próprio bot
+        if (message.fromMe) return;
+
+        // Verificar se é mensagem privada
+        if (!message.from.includes('@g.us')) {
+            await handlePrivateMessage(client, message);
+            return;
+        }
+
+        const groupId = message.from;
+        const messageBody = message.body?.trim() || '';
+        
+        // Verificar se a mensagem começa com o prefixo
+        if (!messageBody.startsWith(config.prefix)) return;
+
+        // Extrair comando e argumentos
+        const args = messageBody.slice(config.prefix.length).trim().split(' ');
+        const command = args.shift()?.toLowerCase();
+        const argsString = args.join(' ');
+
+        // Log do comando
+        Logger.command(Utils.getUsername(message), `${config.prefix}${command}`, Utils.getGroupName(groupId));
+
+        // Verificar status do grupo (otimizado com cache)
+        const groupStatus = await RentalSystem.checkGroupStatus(groupId);
+        if (!groupStatus.active && !Utils.isOwner(message)) {
+            await message.reply(groupStatus.message);
+            return;
+        }
+
+        // Lista de comandos disponíveis
+        const availableCommands = [
+            'menu', 'ban', 'unban', 'kick', 'add', 'promote', 'demote', 'mute', 'unmute',
+            'banfoto', 'bangringo', 'addads', 'rmads', 'listads', 'statusads', 'bv', 'legendabv',
+            'abrirgrupo', 'fechargrupo', 'abrirgp', 'fechargp', 'afgp', 'sorteio', 'horarios',
+            'autoresposta', 'checkpanel', 'fixpanel', 'syncstatus', 'syncpanel', 'linkgp', 'id',
+            'sorte', 'conselhos', 'conselho', 'allg', 'allg2', 'ping', 'status', 'uptime'
+        ];
+
+        if (!availableCommands.includes(command)) {
+            return; // Comando não reconhecido, ignorar silenciosamente
+        }
+
+        // ====================================================================================================
+        // 🎯 ROTEAMENTO DE COMANDOS OTIMIZADO
+        // ====================================================================================================
+
         switch (command) {
+            // Comandos do sistema
             case 'menu':
-                // Verificar modo SOADM para comando interativo
-                const soadmStatusMenu = await DataManager.loadConfig(groupId, 'soadm');
-                const isOwnerMenu = Utils.isOwner(message);
-                const isAdminMenu = await Utils.isAdmin(message);
+                await menuHandler.handle(client, message, command, argsString);
+                break;
+
+            case 'ping':
+                const pingStart = Date.now();
+                const pingMessage = await message.reply('🏓 Pong!');
+                const pingTime = Date.now() - pingStart;
                 
-                if ((soadmStatusMenu === '1' || soadmStatusMenu === 1) && !isAdminMenu && !isOwnerMenu) {
+                const sysInfo = Utils.getSystemInfo();
+                const statusText = `🏓 *Pong!*\n\n` +
+                    `⚡ *Latência:* ${pingTime}ms\n` +
+                    `🕐 *Uptime:* ${Math.floor(sysInfo.uptime / 60)}min\n` +
+                    `💾 *RAM:* ${sysInfo.memory.heapUsed}\n` +
+                    `🤖 *Versão:* ${config.botInfo.versao}\n` +
+                    `📅 *Data:* ${moment().format('DD/MM/YYYY HH:mm:ss')}`;
+                
+                setTimeout(async () => {
+                    try {
+                        await pingMessage.edit(statusText);
+                    } catch (error) {
+                        await message.reply(statusText);
+                    }
+                }, 1000);
+                break;
+
+            case 'status':
+            case 'uptime':
+                const sysStatus = Utils.getSystemInfo();
+                const uptimeHours = Math.floor(sysStatus.uptime / 3600);
+                const uptimeMinutes = Math.floor((sysStatus.uptime % 3600) / 60);
+                
+                const statusResponse = `📊 *STATUS DO SISTEMA*\n\n` +
+                    `🟢 *Status:* Online\n` +
+                    `⏰ *Uptime:* ${uptimeHours}h ${uptimeMinutes}min\n` +
+                    `💾 *Memória:*\n` +
+                    `   • Heap: ${sysStatus.memory.heapUsed}\n` +
+                    `   • Total: ${sysStatus.memory.heapTotal}\n` +
+                    `🖥️ *Sistema:* ${sysStatus.platform}\n` +
+                    `⚡ *Node.js:* ${sysStatus.version}\n` +
+                    `🤖 *Bot:* v${config.botInfo.versao}\n` +
+                    `📅 *Última inicialização:* ${moment().subtract(sysStatus.uptime, 'seconds').format('DD/MM/YYYY HH:mm:ss')}`;
+                
+                await message.reply(statusResponse);
+                break;
+
+            // Comandos de moderação
+            case 'ban':
+            case 'unban':
+            case 'kick':
+            case 'add':
+            case 'promote':
+            case 'demote':
+            case 'mute':
+            case 'unmute':
+            case 'banfoto':
+            case 'bangringo':
+                await banHandler.handle(client, message, command, argsString);
+                break;
+
+            // Comandos de anúncios (handler otimizado)
+            case 'addads':
+            case 'listads':
+            case 'rmads':
+            case 'statusads':
+                await adsHandler.handle(client, message, command, argsString);
+                break;
+
+            // Comandos de debug e painel
+            case 'checkpanel':
+            case 'fixpanel':
+                const debugHandler = require('./commands/debug');
+                await debugHandler.handle(client, message, command, argsString);
+                break;
+
+            // Comandos de bem-vindo
+            case 'bv':
+            case 'legendabv':
+                await welcomeHandler.handle(client, message, command, argsString);
+                break;
+
+            // Comandos de controle de grupo
+            case 'abrirgrupo':
+            case 'fechargrupo':
+            case 'abrirgp':
+            case 'fechargp':
+            case 'afgp':
+                await groupControlHandler.handle(client, message, command, argsString);
+                break;
+
+            // Comando de sorteio
+            case 'sorteio':
+                await sorteioHandler.handle(client, message, argsString);
+                break;
+
+            // Comandos de horários
+            case 'horarios':
+                // Verificar modo SOADM para comando interativo
+                const soadmStatusHorarios = await DataManager.loadConfig(groupId, 'soadm');
+                const isOwnerHorarios = Utils.isOwner(message);
+                const isAdminHorarios = await Utils.isAdmin(message);
+                
+                if ((soadmStatusHorarios === '1' || soadmStatusHorarios === 1) && !isAdminHorarios && !isOwnerHorarios) {
                     await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
                     return;
                 }
                 
-                await menuHandler.handle(client, message, args);
+                await horariosHandler.handle(client, message, command, argsString);
                 break;
 
-            case 'soadm':
-                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
-                    await message.reply('🚫 Apenas administradores podem usar este comando.');
-                    return;
-                }
-                
-                const statusSoadm = parseInt(args);
-                if (statusSoadm === 1) {
-                    await DataManager.saveConfig(groupId, 'soadm', '1');
-                    // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
-                    await sincronizarGrupoComPainel(groupId, DataManager);
-                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos\n📝 Comandos afetados: !horarios, !sorte, !conselhos, !menu');
-                } else if (statusSoadm === 0) {
-                    await DataManager.saveConfig(groupId, 'soadm', '0');
-                    // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
-                    await sincronizarGrupoComPainel(groupId, DataManager);
-                    await message.reply('🔓 *Modo SOADM desativado!*\n\n👥 Todos os membros podem usar comandos interativos');
-                } else {
-                    await message.reply('❌ Use: !soadm 1 (ativar) ou !soadm 0 (desativar)');
-                }
+            // Comando de autoresposta
+            case 'autoresposta':
+                await autoRespostaHandler.handle(client, message, command, argsString);
                 break;
 
+            // Comandos de sincronização
             case 'syncstatus':
-                await syncStatusHandler.handle(client, message, command, args);
+                await syncStatusHandler.handle(client, message, command, argsString);
                 break;
 
             case 'syncpanel':
-                await syncPanelHandler.handle(client, message, command, args);
+                await syncPanelHandler.handle(client, message, command, argsString);
                 break;
 
+            // Comando de link do grupo
             case 'linkgp':
                 try {
                     // Verificar modo SOADM para comando !linkgp
@@ -611,7 +772,6 @@ client.on('message_create', async (message) => {
                     const isOwnerLink = Utils.isOwner(message);
                     const isAdminLink = await Utils.isAdmin(message);
                     
-                    // Se SOADM ativado e usuário não é admin/dono, bloquear
                     if ((soadmStatusLink === '1' || soadmStatusLink === 1) && !isAdminLink && !isOwnerLink) {
                         await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
                         return;
@@ -623,13 +783,10 @@ client.on('message_create', async (message) => {
                         return;
                     }
 
-                    // Gerar link de convite do grupo
                     const inviteCode = await chat.getInviteCode();
                     const groupLink = `https://chat.whatsapp.com/${inviteCode}`;
                     
                     await message.reply(`🔗 *Link do Grupo:*\n\n${groupLink}\n\n📋 *Nome:* ${chat.name}\n👥 *Participantes:* ${chat.participants.length}`);
-                    
-                    Logger.command(Utils.getUsername(message), '!linkgp', Utils.getGroupName(groupId));
                     
                 } catch (error) {
                     Logger.error(`Erro no comando !linkgp: ${error.message}`);
@@ -637,8 +794,8 @@ client.on('message_create', async (message) => {
                 }
                 break;
 
+            // Comando de ID do grupo
             case 'id':
-                // Verificar se é admin ou dono
                 if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
                     await message.reply('🚫 Apenas administradores podem usar este comando.');
                     return;
@@ -653,16 +810,14 @@ client.on('message_create', async (message) => {
 
                     await message.reply(`🆔 *ID do Grupo:*\n\n\`${groupId}\`\n\n📋 *Nome:* ${chat.name}\n👥 *Participantes:* ${chat.participants.length}`);
                     
-                    Logger.command(Utils.getUsername(message), '!id', Utils.getGroupName(groupId));
-                    
                 } catch (error) {
                     Logger.error(`Erro no comando !id: ${error.message}`);
                     await message.reply('❌ Erro ao obter ID do grupo.');
                 }
                 break;
 
+            // Comando de sorte
             case 'sorte':
-                // Verificar modo SOADM
                 const soadmStatus = await DataManager.loadConfig(groupId, 'soadm');
                 const isOwnerSorte = Utils.isOwner(message);
                 const isAdminSorte = await Utils.isAdmin(message);
@@ -686,9 +841,9 @@ client.on('message_create', async (message) => {
                 await message.reply(mensagem);
                 break;
 
+            // Comando de conselhos (com IA)
             case 'conselhos':
             case 'conselho':
-                // Verificar modo SOADM
                 const soadmStatusConselho = await DataManager.loadConfig(groupId, 'soadm');
                 const isOwnerConselho = Utils.isOwner(message);
                 const isAdminConselho = await Utils.isAdmin(message);
@@ -699,305 +854,67 @@ client.on('message_create', async (message) => {
                 }
                 
                 try {
-                    // Usar variável de ambiente ou chave do config
                     const apiKey = process.env.GROQ_API_KEY || config.groqApiKey || 'SUA_CHAVE_GROQ_AQUI';
                     
                     if (apiKey === 'SUA_CHAVE_GROQ_AQUI') {
-                        await message.reply('⚠️ *Comando não configurado!*\n\nConfigure a chave da API Groq no config.json:\n```\n"groqApiKey": "sua_chave_aqui"\n```');
-                        break;
+                        await message.reply('⚠️ *Comando não configurado!*\n\nConfigure a chave da API Groq no config.json');
+                        return;
                     }
-                    
-                    const apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
 
-                    const requestBody = {
+                    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
                         model: 'llama3-8b-8192',
-                        messages: [{
-                            role: 'user',
-                            content: 'Dê-me um conselho motivacional curto e inspirador para o meu dia. mas quero só o conselho e não use inicias como "aqui esta um conselho"'
-                        }]
-                    };
-
-                    const response = await axios.post(apiUrl, requestBody, {
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'Você é um conselheiro sábio e positivo. Dê conselhos inspiradores e motivacionais em português do Brasil, de forma breve e objetiva.'
+                            },
+                            {
+                                role: 'user',
+                                content: argsString || 'Me dê um conselho motivacional para o dia'
+                            }
+                        ],
+                        max_tokens: 200,
+                        temperature: 0.7
+                    }, {
                         headers: {
-                            'Content-Type': 'application/json',
                             'Authorization': `Bearer ${apiKey}`,
+                            'Content-Type': 'application/json'
                         },
+                        timeout: 10000
                     });
 
                     const conselho = response.data.choices[0].message.content;
-                    await message.reply(`💡 *Conselho do dia:*\n\n${conselho}`);
-                } catch (error) {
-                    Logger.error(`Erro ao buscar conselho: ${error.message}`);
-                    await message.reply('❌ Erro ao buscar conselho. Tente novamente mais tarde.');
-                }
-                break;
-
-            case 'updatebot':
-            case 'atualizar':
-                if (!Utils.isOwner(message)) {
-                    await message.reply('🚫 Apenas o dono pode atualizar o bot.');
-                    return;
-                }
-                
-                await message.reply('🔄 *Iniciando atualização do bot...*\n\n⏳ Verificando atualizações...');
-                
-                try {
-                    const { execSync } = require('child_process');
-                    
-                    // Verificar se há atualizações
-                    execSync('git fetch origin', { stdio: 'pipe' });
-                    const status = execSync('git status -uno', { encoding: 'utf8' });
-                    
-                    if (status.includes('Your branch is up to date')) {
-                        await message.reply('✅ *Bot já está atualizado!*\n\n🎉 Você está usando a versão mais recente.');
-                        return;
-                    }
-                    
-                    // Fazer backup das configurações
-                    const backupTime = Date.now();
-                    await message.reply('💾 *Fazendo backup das configurações...*');
-                    
-                    // Fazer pull das atualizações
-                    await message.reply('📥 *Baixando atualizações...*');
-                    execSync('git stash', { stdio: 'pipe' });
-                    execSync('git pull origin main', { stdio: 'pipe' });
-                    
-                    // Instalar dependências
-                    await message.reply('📦 *Instalando dependências...*');
-                    execSync('npm install', { stdio: 'pipe' });
-                    
-                    // Restaurar stash
-                    try {
-                        execSync('git stash pop', { stdio: 'pipe' });
-                    } catch (error) {
-                        // Ignorar erro se não há stash
-                    }
-                    
-                    await message.reply(`✅ *Bot atualizado com sucesso!*\n\n🔄 *Reiniciando em 5 segundos...*\n💾 Backup salvo: ${backupTime}`);
-                    
-                    Logger.success(`Bot atualizado por ${Utils.getUsername(message)}`);
-                    
-                    // Reiniciar o bot
-                    setTimeout(() => {
-                        process.exit(0);
-                    }, 5000);
+                    await message.reply(`💡 *Conselho do Dia:*\n\n${conselho}\n\n✨ _Tenha um ótimo dia!_`);
                     
                 } catch (error) {
-                    Logger.error(`Erro na atualização: ${error.message}`);
-                    await message.reply('❌ *Erro na atualização!*\n\n🔧 Use o script manual:\n• `node update.js`\n• `npm run update`');
+                    Logger.error(`Erro no comando !conselho: ${error.message}`);
+                    await message.reply('❌ Erro ao gerar conselho. Tente novamente mais tarde.');
                 }
                 break;
 
-            case 'all':
-                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
-                    await message.reply('🚫 Apenas administradores podem usar este comando.');
-                    return;
-                }
-                
-                const chat = await message.getChat();
-                const participants = chat.participants;
-                const mentions = participants.map(p => p.id._serialized);
-                
-                // Se tem argumentos, salvar a mensagem
-                if (args) {
-                    let mediaData = null;
-                    
-                    // Verificar se há mídia
-                    let mediaMessage = null;
-                    if (message.hasMedia) {
-                        mediaMessage = message;
-                    } else if (message.hasQuotedMsg) {
-                        const quotedMsg = await message.getQuotedMessage();
-                        if (quotedMsg.hasMedia) {
-                            mediaMessage = quotedMsg;
-                        }
-                    }
-
-                    // Se há mídia, baixar e salvar
-                    if (mediaMessage) {
-                        const media = await mediaMessage.downloadMedia();
-                        mediaData = {
-                            data: media.data,
-                            mimetype: media.mimetype,
-                            filename: media.filename || `all_message.${media.mimetype.split('/')[1]}`
-                        };
-                    }
-                    
-                    // Salvar mensagem !all
-                    await DataManager.saveConfig(groupId, 'allMessage', {
-                        text: args,
-                        media: mediaData,
-                        savedAt: new Date().toISOString()
-                    });
-                    
-                    await message.reply('✅ Mensagem do !all salva com sucesso!');
-                } else {
-                    // Buscar mensagem salva
-                    const savedMessage = await DataManager.loadConfig(groupId, 'allMessage');
-                    
-                    if (savedMessage && savedMessage.text) {
-                        if (savedMessage.media) {
-                            // Enviar com mídia
-                            const media = new MessageMedia(
-                                savedMessage.media.mimetype,
-                                savedMessage.media.data,
-                                savedMessage.media.filename
-                            );
-                            await client.sendMessage(groupId, media, {
-                                caption: savedMessage.text,
-                                mentions: mentions
-                            });
-                        } else {
-                            // Enviar só texto
-                            await client.sendMessage(groupId, savedMessage.text, {
-                                mentions: mentions
-                            });
-                        }
-                        Logger.success(`Comando !all executado - ${participants.length} membros mencionados`);
-                    } else {
-                        await message.reply('❌ Nenhuma mensagem salva. Use: !all [sua mensagem]');
-                    }
-                }
-                break;
-
+            // Comandos de menção em massa
             case 'allg':
                 try {
                     if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
                         await message.reply('🚫 Apenas administradores podem usar este comando.');
                         return;
                     }
-                    
-                    const chat2 = await message.getChat();
-                    const participants2 = chat2.participants;
-                    const mentions2 = participants2.map(p => p.id._serialized);
-                    
-                    // Verificar se tem mensagem personalizada (args após o comando)
-                    const mensagemPersonalizada = Array.isArray(args) ? args.join(' ').trim() : (args || '').toString().trim();
-                    
-                    if (mensagemPersonalizada) {
-                        // Se tem mensagem personalizada, enviar ela marcando todos
-                        await client.sendMessage(groupId, mensagemPersonalizada, {
-                            mentions: mentions2
-                        });
-                        Logger.success(`Comando !allg executado - mensagem personalizada enviada para ${participants2.length} membros`);
-                    } else if (message.hasQuotedMsg) {
-                        // Se não tem mensagem personalizada mas tem mensagem citada, usar o método antigo
-                        const quotedMessage = await message.getQuotedMessage();
-                        
-                        if (quotedMessage.hasMedia) {
-                            // Mensagem com mídia - Compatibilidade com versão 1.31 Alpha
-                            try {
-                                console.log('📥 Baixando mídia...');
-                                console.log('📋 Tipo de mensagem:', quotedMessage.type);
-                                console.log('📋 HasMedia:', quotedMessage.hasMedia);
-                                
-                                // Múltiplas tentativas com diferentes abordagens para v1.31
-                                let media = null;
-                                
-                                // Tentativa 1: Método padrão
-                                try {
-                                    media = await quotedMessage.downloadMedia();
-                                    console.log('✅ Tentativa 1 - downloadMedia() funcionou');
-                                } catch (err1) {
-                                    console.log('⚠️ Tentativa 1 falhou:', err1.message);
-                                }
-                                
-                                // Tentativa 2: Com timeout maior
-                                if (!media) {
-                                    try {
-                                        console.log('🔄 Tentativa 2 - com timeout...');
-                                        media = await Promise.race([
-                                            quotedMessage.downloadMedia(),
-                                            new Promise((_, reject) => 
-                                                setTimeout(() => reject(new Error('Timeout de 20s')), 20000)
-                                            )
-                                        ]);
-                                        console.log('✅ Tentativa 2 funcionou');
-                                    } catch (err2) {
-                                        console.log('⚠️ Tentativa 2 falhou:', err2.message);
-                                    }
-                                }
-                                
-                                // Tentativa 3: Aguardar um pouco e tentar novamente
-                                if (!media) {
-                                    try {
-                                        console.log('🔄 Tentativa 3 - aguardando 2s...');
-                                        await new Promise(resolve => setTimeout(resolve, 2000));
-                                        media = await quotedMessage.downloadMedia();
-                                        console.log('✅ Tentativa 3 funcionou');
-                                    } catch (err3) {
-                                        console.log('⚠️ Tentativa 3 falhou:', err3.message);
-                                    }
-                                }
-                                
-                                console.log('📊 Debug mídia final:', {
-                                    mediaExists: !!media,
-                                    hasData: !!(media && media.data),
-                                    hasMimetype: !!(media && media.mimetype),
-                                    dataType: typeof (media && media.data),
-                                    dataLength: media && media.data ? media.data.length : 0
-                                });
-                                
-                                // Verificação final
-                                if (!media || !media.data) {
-                                    throw new Error('Todas as tentativas de download falharam - mídia pode estar corrompida ou muito grande');
-                                }
-                                
-                                // Detectar mimetype se não existir (compatibilidade v1.31)
-                                let mimetype = media.mimetype;
-                                if (!mimetype) {
-                                    // Tentar detectar pelo tipo de dados ou usar padrão
-                                    if (typeof media.data === 'string' && media.data.startsWith('/9j/')) {
-                                        mimetype = 'image/jpeg';
-                                    } else if (typeof media.data === 'string' && media.data.startsWith('iVBORw0KGgo')) {
-                                        mimetype = 'image/png';
-                                    } else if (typeof media.data === 'string' && media.data.startsWith('UklGR')) {
-                                        mimetype = 'video/webm';
-                                    } else if (typeof media.data === 'string' && media.data.startsWith('AAAA')) {
-                                        mimetype = 'video/mp4';
-                                    } else {
-                                        mimetype = 'application/octet-stream';
-                                    }
-                                    console.log(`🔍 Mimetype detectado: ${mimetype}`);
-                                } else {
-                                    console.log(`📋 Mimetype original: ${mimetype}`);
-                                }
-                                
-                                const filename = media.filename || 'arquivo';
-                                
-                                console.log(`📤 Enviando: ${mimetype} (${filename}) - ${media.data.length} bytes`);
-                                
-                                const messageMedia = new MessageMedia(mimetype, media.data, filename);
-                                
-                                await client.sendMessage(groupId, messageMedia, {
-                                    caption: quotedMessage.body || '',
-                                    mentions: mentions2
-                                });
-                                
-                                console.log('✅ Mídia enviada com sucesso para o grupo!');
-                            } catch (mediaError) {
-                                console.log(`⚠️ Erro ao processar mídia (${mediaError.message}), tentando apenas texto...`);
-                                // Se falhar com mídia, enviar só o texto da mensagem
-                                if (quotedMessage.body) {
-                                    await client.sendMessage(groupId, quotedMessage.body, {
-                                        mentions: mentions2
-                                    });
-                                } else {
-                                    await message.reply('❌ Erro ao processar mídia. A mídia pode estar corrompida ou ser muito grande.');
-                                    return;
-                                }
-                            }
-                        } else {
-                            // Mensagem de texto
-                            await client.sendMessage(groupId, quotedMessage.body, {
-                                mentions: mentions2
-                            });
-                        }
-                        Logger.success(`Comando !allg executado - mensagem repostada para ${participants2.length} membros`);
-                    } else {
-                        await message.reply('❌ Você precisa responder a uma mensagem OU escrever uma mensagem junto ao comando.\n\n💡 Exemplos:\n• !allg atenção pessoal\n• !allg (respondendo uma mensagem)');
+
+                    const chat = await message.getChat();
+                    if (!chat.isGroup) {
+                        await message.reply('❌ Este comando só funciona em grupos.');
                         return;
                     }
+
+                    const participants = chat.participants.map(participant => `@${participant.id.user}`);
+                    const mentions = chat.participants.map(participant => participant.id);
+                    
+                    const allgMessage = argsString || 'Atenção pessoal! 📢';
+                    const finalMessage = `${allgMessage}\n\n${participants.join(' ')}`;
+                    
+                    await client.sendMessage(groupId, finalMessage, { mentions });
+                    Logger.success(`Comando !allg executado - ${participants.length} membros mencionados`);
+                    
                 } catch (error) {
                     Logger.error(`Erro no comando !allg: ${error.message}`);
                     await message.reply('❌ Erro ao executar comando !allg. Verifique se sou administrador.');
@@ -1005,55 +922,34 @@ client.on('message_create', async (message) => {
                 break;
 
             case 'allg2':
-                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
-                    await message.reply('🚫 Apenas administradores podem usar este comando.');
-                    return;
-                }
-                
-                if (!message.hasQuotedMsg) {
-                    await message.reply('❌ Você precisa responder a uma mensagem para usar o !allg2');
-                    return;
-                }
-                
                 try {
-                    const quotedMessage2 = await message.getQuotedMessage();
-                    const chat3 = await message.getChat();
-                    const participants3 = chat3.participants;
-                    const mentions3 = participants3.map(p => p.id._serialized);
+                    if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
+                        await message.reply('🚫 Apenas administradores podem usar este comando.');
+                        return;
+                    }
+
+                    const chat2 = await message.getChat();
+                    if (!chat2.isGroup) {
+                        await message.reply('❌ Este comando só funciona em grupos.');
+                        return;
+                    }
+
+                    const participants2 = chat2.participants.map(participant => `@${participant.id.user}`);
+                    const mentions2 = chat2.participants.map(participant => participant.id);
                     
-                    // Criar lista de @ menções
-                    const mentionsList = participants3.map(p => `@${p.id.user}`).join(' ');
+                    const allg2Message = argsString || 'Comunicado importante! 📌';
+                    const finalMessage2 = `${allg2Message}\n\n${participants2.join(' ')}`;
                     
-                    let finalMessage = '';
+                    const sentMessage = await client.sendMessage(groupId, finalMessage2, { mentions: mentions2 });
                     
-                    if (quotedMessage2.hasMedia) {
-                        // Mensagem com mídia
-                        const media2 = await quotedMessage2.downloadMedia();
-                        const messageMedia2 = new MessageMedia(media2.mimetype, media2.data, media2.filename);
-                        
-                        finalMessage = `${quotedMessage2.body || ''}\n\n${mentionsList}\n\n📊 *${participants3.length} membros mencionados*`;
-                        
-                        const sentMessage = await client.sendMessage(groupId, messageMedia2, {
-                            caption: finalMessage,
-                            mentions: mentions3
-                        });
-                        
-                        // Fixar a mensagem
+                    // Tentar fixar a mensagem
+                    try {
                         await sentMessage.pin();
-                        
-                    } else {
-                        // Mensagem de texto
-                        finalMessage = `${quotedMessage2.body}\n\n${mentionsList}\n\n📊 *${participants3.length} membros mencionados*`;
-                        
-                        const sentMessage = await client.sendMessage(groupId, finalMessage, {
-                            mentions: mentions3
-                        });
-                        
-                        // Fixar a mensagem
-                        await sentMessage.pin();
+                    } catch (pinError) {
+                        Logger.warning('Não foi possível fixar a mensagem (permissões insuficientes)');
                     }
                     
-                    Logger.success(`Comando !allg2 executado - ${participants3.length} membros mencionados e mensagem fixada`);
+                    Logger.success(`Comando !allg2 executado - ${participants2.length} membros mencionados e mensagem fixada`);
                     
                 } catch (error) {
                     Logger.error(`Erro no comando !allg2: ${error.message}`);
@@ -1061,178 +957,62 @@ client.on('message_create', async (message) => {
                 }
                 break;
 
-            case 'addads':
-            case 'listads':
-            case 'rmads':
-            case 'statusads':
-                await adsHandler.handle(client, message, command, args);
-                break;
-
-            case 'checkpanel':
-            case 'fixpanel':
-                const debugHandler = require('./commands/debug');
-                await debugHandler.handle(client, message, command, args);
-                break;
-
-            case 'bv':
-            case 'legendabv':
-                await welcomeHandler.handle(client, message, command, args);
-                break;
-
-            case 'abrirgrupo':
-            case 'fechargrupo':
-            case 'abrirgp':
-            case 'fechargp':
-            case 'afgp':
-                await groupControlHandler.handle(client, message, command, args);
-                break;
-
-            case 'sorteio':
-                await sorteioHandler.handle(client, message, args);
-                break;
-
-            case 'horarios':
-                // Verificar modo SOADM para comando interativo
-                const soadmStatusHorarios = await DataManager.loadConfig(groupId, 'soadm');
-                const isOwnerHorarios = Utils.isOwner(message);
-                const isAdminHorarios = await Utils.isAdmin(message);
-                
-                if ((soadmStatusHorarios === '1' || soadmStatusHorarios === 1) && !isAdminHorarios && !isOwnerHorarios) {
-                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
-                    return;
-                }
-                
-                await horariosHandler.handle(client, message, command, args);
-                break;
-
-            case 'apagar':
-            case 'autoresposta':
-                await autoRespostaHandler.handle(client, message, command, args);
-                break;
-                
-            case 'horapg':
-            case 'addhorapg':
-            case 'imagem-horarios':
-                await horariosHandler.handle(client, message, command, args);
-                break;
-
-            case 'banextremo':
-            case 'banlinkgp':
-            case 'antilinkgp':
-            case 'antilink':
-            case 'banfoto':
-            case 'bangringo':
-            case 'ban':
-                await banHandler.handle(client, message, command, args);
-                break;
-
-            case 'liberargrupo':
-                if (!Utils.isOwner(message)) {
-                    await message.reply('🚫 Apenas o dono pode liberar grupos.');
-                    return;
-                }
-                const days = parseInt(args) || 30;
-                await RentalSystem.liberarGrupo(groupId, days);
-                await message.reply(`✅ *Grupo liberado por ${days} dias!*\n\n📅 Válido até: ${moment().add(days, 'days').format('DD/MM/YYYY HH:mm')}`);
-                Logger.success(`Grupo ${Utils.getGroupName(groupId)} liberado por ${days} dias`);
-                break;
-
-            case 'vergrupo':
-                const status = await RentalSystem.checkGroupStatus(groupId);
-                if (status.active) {
-                    await message.reply(`✅ *Grupo ativo!*\n\n📅 Expira em: ${status.expiry}\n⏰ Dias restantes: ${status.daysLeft}`);
-                } else {
-                    await message.reply(status.message);
-                }
-                break;
-
-            case 'debugbot':
-                const isOwner = Utils.isOwner(message);
-                const isAdmin = await Utils.isAdmin(message);
-                const debugChat = await message.getChat();
-                
-                const debugInfo = `🔍 *DEBUG COMPLETO DO BOT*\n\n` +
-                    `👤 *Seu número:* ${message.author ? message.author.replace('@c.us', '') : 'Não detectado'}\n` +
-                    `👑 *Dono configurado:* ${config.numeroDono}\n` +
-                    `✅ *É o dono?* ${isOwner ? '✅ SIM' : '❌ NÃO'}\n` +
-                    `🛡️ *É admin?* ${isAdmin ? '✅ SIM' : '❌ NÃO'}\n` +
-                    `📱 *Nome do grupo:* ${debugChat.name}\n` +
-                    `🆔 *ID do grupo:* ${groupId}\n` +
-                    `👥 *Total de participantes:* ${debugChat.participants.length}\n` +
-                    `🤖 *Bot ativo:* ✅ SIM\n\n` +
-                    `💡 *Dicas:*\n` +
-                    `• Se "É o dono?" = NÃO, verifique config.json\n` +
-                    `• Se "É admin?" = NÃO, verifique se você é admin do grupo\n` +
-                    `• Use !liberargrupo 30 para ativar o grupo`;
-                
-                await message.reply(debugInfo);
-                
-                Logger.info(`Debug solicitado por ${Utils.getUsername(message)} - Dono: ${isOwner}, Admin: ${isAdmin}`);
-                break;
-
             default:
-                // Comando não encontrado
+                // Comando não reconhecido - não fazer nada (já filtrado acima)
                 break;
         }
+
+        // Log de performance do comando
+        const processingTime = Date.now() - startTime;
+        if (processingTime > 1000) {
+            Logger.performance(`Comando ${command} processado`, processingTime);
+        }
+
     } catch (error) {
-        Logger.error(`Erro ao processar comando '${command}': ${error.message}`);
-        await message.reply('❌ Erro interno do bot. Tente novamente.');
+        Logger.error(`Erro crítico ao processar mensagem: ${error.message}`);
+        console.error('Stack trace:', error.stack);
+        
+        try {
+            await message.reply('❌ *Erro interno do sistema*\n\n🔧 Tente novamente em alguns segundos.\n📞 Se o problema persistir, contate o suporte.');
+        } catch (replyError) {
+            Logger.error(`Erro ao enviar mensagem de erro: ${replyError.message}`);
+        }
     }
 });
 
-// Processar novos membros
-client.on('group_join', async (notification) => {
-    const groupId = notification.chatId;
-    const newMemberId = notification.id.participant;
-    
-    // Usar a nova função de boas-vindas com suporte a mídia
-    if (welcomeHandler) {
-        await welcomeHandler.sendWelcome(client, groupId, newMemberId);
-    }
+// ========================================================================================================
+// 🚀 INICIALIZAÇÃO DO BOT
+// ========================================================================================================
+
+// Tratamento de erros não capturados
+process.on('unhandledRejection', (reason, promise) => {
+    Logger.error(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
 });
 
-// Inicialização SIMPLES
-async function initialize() {
-    Logger.logBox('INICIANDO BOT', [
-        'Bot Administrador WhatsApp',
-        `📱 Número: ${config.numeroBot}`,
-        `⏰ ${moment().format('DD/MM/YYYY HH:mm')}`
-    ], 'cyan');
-    
-    try {
-        // Listener para QR apenas (sem código de pareamento problemático)
-        client.on('qr', async (qr) => {
-            // Não gerar código de pareamento - apenas mostrar QR
-            console.log('');
-            Logger.logBox('CONECTE VIA QR CODE', [
-                '📱 Use apenas o QR Code acima',
-                '',
-                '⚠️  CÓDIGO DE PAREAMENTO DESABILITADO',
-                '   (Gerava códigos inválidos)',
-                '',
-                '💡 ALTERNATIVAS:',
-                '   • Use o QR Code (recomendado)',
-                '   • Execute: node test-pairing.js',
-                '',
-                '⏰ QR Code expira em alguns minutos!'
-            ], 'yellow');
-        });
-        
-        // Inicializar cliente
-        await client.initialize();
-        
-    } catch (error) {
-        Logger.error(`Erro na inicialização: ${error.message}`);
-        process.exit(1);
-    }
-}
+process.on('uncaughtException', (error) => {
+    Logger.error(`Uncaught Exception: ${error.message}`);
+    console.error('Stack trace:', error.stack);
+});
 
-// Exportar para uso nos módulos
+// Inicializar o cliente
+Logger.logBox('INICIANDO BOT WHATSAPP', [
+    `🤖 Bot Administrador v${config.botInfo.versao}`,
+    `👑 Dono: ${config.numeroDono}`,
+    `🌍 Timezone: ${config.timezone}`,
+    `📅 Data: ${moment().format('DD/MM/YYYY HH:mm:ss')}`,
+    '',
+    '🔄 Inicializando cliente WhatsApp...'
+], 'blue');
+
+client.initialize();
+
+// Exportar para uso em outros módulos
 module.exports = {
     client,
     DataManager,
-    RentalSystem,
     Utils,
+    Logger,
+    RentalSystem,
     config
 };
 
@@ -1257,6 +1037,3 @@ if (!fs.existsSync('./data')) {
         }
     });
 }
-
-// Inicializar bot direto
-initialize();
