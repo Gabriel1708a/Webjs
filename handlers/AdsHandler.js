@@ -3,6 +3,8 @@ const config = require('../config.json');
 const fs = require('fs-extra');
 const path = require('path');
 const moment = require('moment-timezone');
+const Utils = require('../utils/Utils');
+const Sender = require('../utils/Sender'); // Importar Sender para envios seguros
 
 class AdsHandler {
     static intervals = new Map(); // Armazenar intervalos ativos
@@ -48,47 +50,54 @@ class AdsHandler {
         }
     }
 
-    static async handle(client, message, command, args) {
-        const groupId = message.from;
-
-        // Verificação simples de admin (temporária)
-        const chat = await message.getChat();
-        let isAuthorized = false;
+    static async handleAdsCommand(client, message, command, args) {
+        console.log(`[ADS] 📢 Comando: ${command} | Grupo: ${message.from}`);
         
-        if (chat.isGroup) {
-            const participant = chat.participants.find(p => p.id._serialized === message.author);
-            isAuthorized = participant && (participant.isAdmin || participant.isSuperAdmin);
-        } else {
-            isAuthorized = true; // PV sempre autorizado
-        }
+        try {
+            const groupId = message.from;
+            
+            // Verificar se é grupo e se usuário é admin
+            const chat = await message.getChat();
+            let isAuthorized = false;
 
-        if (!isAuthorized) {
-            await message.reply('🚫 Apenas administradores podem gerenciar anúncios.');
-            return;
-        }
+            if (chat.isGroup) {
+                const participant = chat.participants.find(p => p.id._serialized === message.author);
+                isAuthorized = participant && (participant.isAdmin || participant.isSuperAdmin);
+            } else {
+                isAuthorized = true; // PV sempre autorizado
+            }
 
-        switch (command) {
-            case 'addads':
-                await this.addAd(client, message, groupId, args);
-                break;
+            if (!isAuthorized) {
+                await Sender.sendMessage(client, message.from, '🚫 Apenas administradores podem gerenciar anúncios.');
+                return;
+            }
 
-            case 'listads':
-                await this.listAds(client, message, groupId);
-                break;
+            switch (command) {
+                case 'addads':
+                    await this.addAd(client, message, groupId, args);
+                    break;
 
-            case 'rmads':
-                await this.removeAd(client, message, groupId, args);
-                break;
+                case 'listads':
+                    await this.listAds(client, message, groupId);
+                    break;
 
-            case 'statusads':
-                await this.showStatus(client, message, groupId);
-                break;
+                case 'rmads':
+                    await this.removeAd(client, message, groupId, args);
+                    break;
+
+                case 'statusads':
+                    await this.showStatus(client, message, groupId);
+                    break;
+            }
+        } catch (error) {
+            console.error(`[ADS] Erro no comando ${command}:`, error);
+            await Sender.sendMessage(client, message.from, '❌ Erro interno no sistema de anúncios. Tente novamente.');
         }
     }
 
     static async addAd(client, message, groupId, args) {
         if (!args.includes('|')) {
-            await message.reply('❌ *Formato incorreto!*\n\n📝 Use: !addads mensagem|intervalo\n\n🔸 Exemplo: !addads Visite nosso site!|60\n🔸 Intervalo em minutos\n\n📷 *Suporte a mídia:*\n• Envie imagem/vídeo com comando na legenda\n• Ou responda mídia com o comando');
+            await Sender.sendMessage(client, message.from, '❌ *Formato incorreto!*\n\n📝 Use: !addads mensagem|intervalo\n\n🔸 Exemplo: !addads Visite nosso site!|60\n🔸 Intervalo em minutos\n\n📷 *Suporte a mídia:*\n• Envie imagem/vídeo com comando na legenda\n• Ou responda mídia com o comando');
             return;
         }
 
@@ -96,7 +105,7 @@ class AdsHandler {
         const intervalo = parseInt(intervaloStr);
 
         if (!mensagem || !intervalo || intervalo < 1) {
-            await message.reply('❌ *Dados inválidos!*\n\n✅ Mensagem e intervalo (em minutos) são obrigatórios');
+            await Sender.sendMessage(client, message.from, '❌ *Dados inválidos!*\n\n✅ Mensagem e intervalo (em minutos) são obrigatórios');
             return;
         }
 
@@ -158,42 +167,46 @@ class AdsHandler {
             const tipoMidia = mediaData ? `📷 ${mediaData.mimetype.includes('video') ? 'Vídeo' : 'Imagem'}` : '📝 Texto';
             const syncStatus = syncResult.success ? '✅ Sincronizado com o painel' : '⚠️ Salvo localmente (painel indisponível)';
             
-            await message.reply(`✅ *Anúncio criado!*\n\n📢 ID: ${adId}\n⏰ Intervalo: ${intervalo} minutos\n${tipoMidia}\n📝 Mensagem: ${mensagem.substring(0, 50)}${mensagem.length > 50 ? '...' : ''}\n\n🔄 ${syncStatus}`);
+            await Sender.sendMessage(client, message.from, `✅ *Anúncio criado!*\n\n📢 ID: ${adId}\n⏰ Intervalo: ${intervalo} minutos\n${tipoMidia}\n📝 Mensagem: ${mensagem.substring(0, 50)}${mensagem.length > 50 ? '...' : ''}\n\n🔄 ${syncStatus}`);
 
         } catch (error) {
             console.error('Erro ao criar anúncio:', error);
-            await message.reply('❌ Erro ao criar anúncio. Tente novamente.');
+            await Sender.sendMessage(client, message.from, '❌ Erro ao criar anúncio. Tente novamente.');
         }
     }
 
     static async listAds(client, message, groupId) {
+        console.log(`📋 [LISTADS] Iniciando listagem para grupo: ${groupId}`);
+        
         try {
-            console.log(`📊 [LISTADS] Iniciando listagem para grupo: ${groupId}`);
-            
-            // Buscar dados em paralelo para melhor performance
+            // Buscar anúncios em paralelo
             const [panelAds, localAds] = await Promise.all([
                 this.fetchAdsFromPanelCached(groupId),
                 this.getLocalAds(groupId)
             ]);
 
-            console.log(`📊 [LISTADS] Anúncios encontrados - Painel: ${panelAds.length}, Locais: ${Object.keys(localAds).length}`);
+            console.log(`📡 [LISTADS] Painel: ${panelAds.length} anúncios`);
+            console.log(`💾 [LISTADS] Local: ${Object.keys(localAds).length} anúncios`);
 
-            let allAds = {};
+            // Combinar anúncios
+            const allAds = {};
 
-            // Combinar anúncios do painel e locais com tratamento robusto
-            if (Array.isArray(panelAds) && panelAds.length > 0) {
+            // Processar anúncios do painel
+            if (Array.isArray(panelAds)) {
                 panelAds.forEach(ad => {
                     try {
-                        const adId = `panel_${ad.id}`;
-                        allAds[adId] = {
-                            id: adId,
-                            mensagem: ad.content || ad.mensagem || 'Sem mensagem',
-                            intervalo: ad.interval || ad.intervalo || 60,
-                            ativo: ad.active !== undefined ? ad.active : (ad.ativo !== undefined ? ad.ativo : true),
-                            tipo: (ad.media_url || ad.full_media_url) ? 'midia' : 'texto',
-                            origem: 'painel',
-                            criado: ad.created_at || ad.criado || new Date().toISOString()
-                        };
+                        if (ad && ad.id) {
+                            const adId = `panel_${ad.id}`;
+                            allAds[adId] = {
+                                id: adId,
+                                mensagem: ad.mensagem || ad.message || 'Sem mensagem',
+                                intervalo: ad.intervalo || ad.interval || 60,
+                                ativo: ad.ativo !== undefined ? ad.ativo : (ad.active !== undefined ? ad.active : true),
+                                tipo: ad.tipo || ad.type || (ad.media ? 'midia' : 'texto'),
+                                origem: 'painel',
+                                criado: ad.criado || ad.created_at || new Date().toISOString()
+                            };
+                        }
                     } catch (err) {
                         console.error(`[LISTADS] Erro ao processar anúncio do painel:`, err);
                     }
@@ -226,7 +239,7 @@ class AdsHandler {
             console.log(`📊 [LISTADS] Total de anúncios combinados: ${totalAds}`);
 
             if (totalAds === 0) {
-                await message.reply('📭 *Nenhum anúncio cadastrado neste grupo*\n\n💡 Use !addads para criar um anúncio\n\n🔍 *Fontes verificadas:*\n☁️ Painel Laravel\n💾 Arquivo local');
+                await Sender.sendMessage(client, message.from, '📭 *Nenhum anúncio cadastrado neste grupo*\n\n💡 Use !addads para criar um anúncio\n\n🔍 *Fontes verificadas:*\n☁️ Painel Laravel\n💾 Arquivo local');
                 return;
             }
 
@@ -273,12 +286,13 @@ class AdsHandler {
             finalText += `📊 *Total:* ${totalAds} anúncios\n`;
             finalText += `🔍 *Fontes:* ☁️ Painel (${panelAds.length}) | 💾 Local (${Object.keys(localAds).length})`;
 
-            await message.reply(finalText);
+            // Usar Sender para envio seguro e evitar validateAndGetParts
+            await Sender.sendMessage(client, message.from, finalText);
             console.log(`📊 [LISTADS] Listagem enviada com sucesso - ${totalAds} anúncios`);
 
         } catch (error) {
             console.error('[LISTADS] Erro crítico ao listar anúncios:', error);
-            await message.reply('❌ *Erro ao listar anúncios*\n\n🔍 Verifique os logs para mais detalhes.\n💡 Tente novamente em alguns segundos.');
+            await Sender.sendMessage(client, message.from, '❌ *Erro ao listar anúncios*\n\n🔍 Verifique os logs para mais detalhes.\n💡 Tente novamente em alguns segundos.');
         }
     }
 
@@ -286,7 +300,7 @@ class AdsHandler {
         const adId = args.trim();
 
         if (!adId) {
-            await message.reply('❌ *Digite o ID do anúncio!*\n\n📝 Use: !rmads ID\n💡 Veja os IDs com !listads');
+            await Sender.sendMessage(client, message.from, '❌ *Digite o ID do anúncio!*\n\n📝 Use: !rmads ID\n💡 Veja os IDs com !listads');
             return;
         }
 
@@ -300,70 +314,77 @@ class AdsHandler {
             let origin = '';
             let errorMessage = '';
 
-            // Verificar se é um anúncio do painel (panel_X) ou local (local_X)
+            // Tentar remover do painel se for anúncio do painel
             if (adId.startsWith('panel_')) {
-                const panelId = adId.replace('panel_', '');
-                console.log(`[RMADS] Removendo anúncio do painel: ${panelId}`);
-                const result = await this.removeAdFromPanel(panelId);
-                if (result.success) {
+                try {
+                    const panelId = adId.replace('panel_', '');
+                    await this.removeFromPanel(groupId, panelId);
                     removed = true;
-                    origin = 'painel ☁️';
-                } else {
-                    errorMessage = result.error || 'Erro desconhecido';
+                    origin = 'Painel Laravel';
+                } catch (panelError) {
+                    console.error('[RMADS] Erro ao remover do painel:', panelError);
+                    errorMessage = `Erro no painel: ${panelError.message}`;
                 }
-            } else if (adId.startsWith('local_')) {
-                const localId = adId.replace('local_', '');
-                console.log(`[RMADS] Removendo anúncio local: ${localId}`);
-                const result = await this.removeLocalAd(groupId, localId);
-                if (result.success) {
-                    removed = true;
-                    origin = 'local 💾';
-                } else {
-                    errorMessage = result.error || 'Erro desconhecido';
-                }
-            } else {
-                // Tentar remover como ID local (compatibilidade)
-                console.log(`[RMADS] Tentando remover como anúncio local (compatibilidade): ${adId}`);
-                const result = await this.removeLocalAd(groupId, adId);
-                if (result.success) {
-                    removed = true;
-                    origin = 'local 💾 (compatibilidade)';
-                } else {
-                    errorMessage = result.error || 'Anúncio não encontrado';
+            }
+
+            // Tentar remover local
+            if (adId.startsWith('local_') || !removed) {
+                try {
+                    const localAds = await this.getLocalAds(groupId);
+                    const localId = adId.startsWith('local_') ? adId : `local_${adId}`;
+                    
+                    if (localAds[localId]) {
+                        delete localAds[localId];
+                        await this.saveLocalAds(groupId, localAds);
+                        removed = true;
+                        origin = origin ? `${origin} + Local` : 'Local';
+                    } else if (!removed) {
+                        errorMessage = 'ID não encontrado nos arquivos locais';
+                    }
+                } catch (localError) {
+                    console.error('[RMADS] Erro ao remover local:', localError);
+                    if (!removed) {
+                        errorMessage = `Erro local: ${localError.message}`;
+                    }
                 }
             }
 
             if (removed) {
-                console.log(`[RMADS] Anúncio ${adId} removido com sucesso - Origem: ${origin}`);
-                await message.reply(`✅ *Anúncio removido com sucesso!*\n\n🗑️ *ID:* ${adId}\n📍 *Origem:* ${origin}\n🔄 *Status:* Sincronizado automaticamente`);
+                await Sender.sendMessage(client, message.from, `✅ *Anúncio removido com sucesso!*\n\n🗑️ *ID:* ${adId}\n📍 *Origem:* ${origin}\n🔄 *Status:* Sincronizado automaticamente`);
+                console.log(`[RMADS] ✅ Anúncio removido: ${adId} - Origem: ${origin}`);
             } else {
-                console.log(`[RMADS] Falha ao remover anúncio ${adId} - Erro: ${errorMessage}`);
-                await message.reply(`❌ *Anúncio não encontrado!*\n\n🔍 *ID:* ${adId}\n📝 *Erro:* ${errorMessage}\n\n💡 Use !listads para ver anúncios disponíveis\n🔧 Use o ID completo (ex: local_1 ou panel_2)`);
+                await Sender.sendMessage(client, message.from, `❌ *Anúncio não encontrado!*\n\n🔍 *ID:* ${adId}\n📝 *Erro:* ${errorMessage}\n\n💡 Use !listads para ver anúncios disponíveis\n🔧 Use o ID completo (ex: local_1 ou panel_2)`);
+                console.log(`[RMADS] ❌ Falha na remoção: ${adId} - ${errorMessage}`);
             }
 
         } catch (error) {
-            console.error('[RMADS] Erro crítico ao remover anúncio:', error);
-            await message.reply('❌ *Erro interno ao remover anúncio*\n\n🔍 Verifique os logs do sistema\n💡 Tente novamente em alguns segundos');
+            console.error('[RMADS] Erro crítico:', error);
+            await Sender.sendMessage(client, message.from, '❌ *Erro interno ao remover anúncio*\n\n🔍 Verifique os logs do sistema\n💡 Tente novamente em alguns segundos');
         }
     }
 
     static async showStatus(client, message, groupId) {
         try {
-            const panelAds = await this.fetchAdsFromPanelCached(groupId);
-            const localAds = await this.getLocalAds(groupId);
-            const activeIntervals = Array.from(this.intervals.keys()).filter(key => key.startsWith(groupId)).length;
+            const [panelAds, localAds] = await Promise.all([
+                this.fetchAdsFromPanelCached(groupId),
+                this.getLocalAds(groupId)
+            ]);
+
+            const panelCount = Array.isArray(panelAds) ? panelAds.length : 0;
+            const localCount = Object.keys(localAds).length;
+            const totalCount = panelCount + localCount;
 
             const status = `📊 *STATUS DOS ANÚNCIOS*\n\n` +
-                          `🏢 *Painel:* ${panelAds.length} anúncios\n` +
-                          `💾 *Local:* ${Object.keys(localAds).length} anúncios\n` +
-                          `⏰ *Timers ativos:* ${activeIntervals}\n` +
-                          `🔗 *Conexão:* ${panelAds.length > 0 ? '✅ Online' : '❌ Offline'}\n\n` +
-                          `🔄 *Última verificação:* ${new Date().toLocaleTimeString()}`;
+                          `☁️ *Painel Laravel:* ${panelCount} anúncios\n` +
+                          `💾 *Arquivo Local:* ${localCount} anúncios\n` +
+                          `📈 *Total:* ${totalCount} anúncios\n\n` +
+                          `🔄 *Cache:* ${this.panelCache.has(groupId) ? 'Ativo' : 'Vazio'}\n` +
+                          `⏰ *Última atualização:* ${new Date().toLocaleString('pt-BR')}`;
 
-            await message.reply(status);
+            await Sender.sendMessage(client, message.from, status);
         } catch (error) {
-            console.error('Erro ao mostrar status:', error);
-            await message.reply('❌ Erro ao obter status.');
+            console.error('[STATUSADS] Erro:', error);
+            await Sender.sendMessage(client, message.from, '❌ Erro ao obter status.');
         }
     }
 
@@ -472,7 +493,7 @@ class AdsHandler {
         }
     }
 
-    static async removeAdFromPanel(adId) {
+    static async removeFromPanel(groupId, adId) {
         try {
             await axios.delete(`${config.laravelApi.baseUrl}/ads/${adId}`, {
                 headers: {

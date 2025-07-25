@@ -554,15 +554,10 @@ async function executeCommand(command, args, message, chat) {
                 break;
                 
             case 'listads':
-                await AdsHandler.listAds(client, message, args);
-                break;
-                
-            case 'addad':
-                await AdsHandler.addAd(client, message, args);
-                break;
-                
-            case 'removead':
-                await AdsHandler.removeAd(client, message, args);
+            case 'addads':
+            case 'rmads':
+            case 'statusads':
+                await AdsHandler.handleAdsCommand(client, message, command, args);
                 break;
                 
             case 'ban':
