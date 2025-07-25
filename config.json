@@ -9,9 +9,12 @@
     "enabled": true,
     "baseUrl": "https://painel.botwpp.tech/api",
     "token": "teste",
-    "timeout": 10000,
+    "timeout": 15000,
     "retryAttempts": 3,
-    "retryDelay": 2000
+    "retryDelay": 2000,
+    "maxConcurrentRequests": 5,
+    "cacheEnabled": true,
+    "cacheDuration": 30000
   },
   "sync": {
     "adsInterval": 30000,

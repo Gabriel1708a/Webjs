@@ -4,6 +4,9 @@ const config = require('../config.json');
 
 class AdsHandler {
     static intervals = new Map(); // Armazenar intervalos ativos
+    static panelCache = new Map(); // Cache para dados do painel
+    static cacheExpiry = new Map(); // Controle de expiração do cache
+    static CACHE_DURATION = 30000; // 30 segundos de cache
 
     static async handle(client, message, command, args) {
         const groupId = message.from;
@@ -92,6 +95,9 @@ class AdsHandler {
             ads.anuncios[groupId][adId] = adData;
             await DataManager.saveData('ads.json', ads);
 
+            // Limpar cache do painel para este grupo
+            this.clearCacheForGroup(groupId);
+
             // Sincronizar com o banco de dados de forma aprimorada
             const syncResult = await this.syncAdWithDatabase(groupId, adData, 'create');
             
@@ -111,41 +117,65 @@ class AdsHandler {
 
     static async listAds(client, message, groupId) {
         try {
-            // Primeiro, tentar buscar do painel
-            const panelAds = await this.fetchAdsFromPanel(groupId);
-            const localAds = await this.getLocalAds(groupId);
+            console.log(`📊 [LISTADS] Iniciando listagem para grupo: ${groupId}`);
+            
+            // Buscar dados em paralelo para melhor performance
+            const [panelAds, localAds] = await Promise.all([
+                this.fetchAdsFromPanelCached(groupId),
+                this.getLocalAds(groupId)
+            ]);
 
-            console.log(`📊 Debug !listads - Grupo: ${groupId}`);
-            console.log(`📊 Anúncios do painel:`, panelAds.length);
-            console.log(`📊 Anúncios locais:`, Object.keys(localAds).length);
+            console.log(`📊 [LISTADS] Anúncios encontrados - Painel: ${panelAds.length}, Locais: ${Object.keys(localAds).length}`);
 
             let allAds = {};
 
-            // Combinar anúncios do painel e locais
-            panelAds.forEach(ad => {
-                allAds[`panel_${ad.id}`] = {
-                    id: `panel_${ad.id}`,
-                    mensagem: ad.content || ad.mensagem,
-                    intervalo: ad.interval || ad.intervalo,
-                    ativo: ad.active !== undefined ? ad.active : ad.ativo,
-                    tipo: ad.media_url ? 'midia' : 'texto',
-                    origem: 'painel'
-                };
-            });
+            // Combinar anúncios do painel e locais com tratamento robusto
+            if (Array.isArray(panelAds) && panelAds.length > 0) {
+                panelAds.forEach(ad => {
+                    try {
+                        const adId = `panel_${ad.id}`;
+                        allAds[adId] = {
+                            id: adId,
+                            mensagem: ad.content || ad.mensagem || 'Sem mensagem',
+                            intervalo: ad.interval || ad.intervalo || 60,
+                            ativo: ad.active !== undefined ? ad.active : (ad.ativo !== undefined ? ad.ativo : true),
+                            tipo: (ad.media_url || ad.full_media_url) ? 'midia' : 'texto',
+                            origem: 'painel',
+                            criado: ad.created_at || ad.criado || new Date().toISOString()
+                        };
+                    } catch (err) {
+                        console.error(`[LISTADS] Erro ao processar anúncio do painel:`, err);
+                    }
+                });
+            }
 
-            Object.values(localAds).forEach(ad => {
-                allAds[`local_${ad.id}`] = {
-                    id: `local_${ad.id}`,
-                    mensagem: ad.mensagem,
-                    intervalo: ad.intervalo,
-                    ativo: ad.ativo,
-                    tipo: ad.tipo,
-                    origem: 'local'
-                };
-            });
+            // Processar anúncios locais
+            if (localAds && typeof localAds === 'object') {
+                Object.values(localAds).forEach(ad => {
+                    try {
+                        if (ad && ad.id) {
+                            const adId = `local_${ad.id}`;
+                            allAds[adId] = {
+                                id: adId,
+                                mensagem: ad.mensagem || 'Sem mensagem',
+                                intervalo: ad.intervalo || 60,
+                                ativo: ad.ativo !== undefined ? ad.ativo : true,
+                                tipo: ad.tipo || (ad.media ? 'midia' : 'texto'),
+                                origem: 'local',
+                                criado: ad.criado || new Date().toISOString()
+                            };
+                        }
+                    } catch (err) {
+                        console.error(`[LISTADS] Erro ao processar anúncio local:`, err);
+                    }
+                });
+            }
 
-            if (Object.keys(allAds).length === 0) {
-                await message.reply('📭 *Nenhum anúncio cadastrado neste grupo*\n\n💡 Use !addads para criar um anúncio');
+            const totalAds = Object.keys(allAds).length;
+            console.log(`📊 [LISTADS] Total de anúncios combinados: ${totalAds}`);
+
+            if (totalAds === 0) {
+                await message.reply('📭 *Nenhum anúncio cadastrado neste grupo*\n\n💡 Use !addads para criar um anúncio\n\n🔍 *Fontes verificadas:*\n☁️ Painel Laravel\n💾 Arquivo local');
                 return;
             }
 
@@ -155,26 +185,31 @@ class AdsHandler {
             let countInativos = 0;
 
             Object.values(allAds).forEach(ad => {
-                const tipoIcon = ad.tipo === 'midia' ? '📷' : '📝';
-                const origemIcon = ad.origem === 'painel' ? '☁️' : '💾';
-                
-                const adInfo = `🆔 *ID:* ${ad.id}\n` +
-                              `⏰ *Intervalo:* ${ad.intervalo} min\n` +
-                              `${tipoIcon} *Tipo:* ${ad.tipo}\n` +
-                              `${origemIcon} *Origem:* ${ad.origem}\n` +
-                              `📝 *Mensagem:* ${ad.mensagem.substring(0, 80)}${ad.mensagem.length > 80 ? '...' : ''}\n` +
-                              `━━━━━━━━━━━━━━━━━━\n\n`;
+                try {
+                    const tipoIcon = ad.tipo === 'midia' ? '🖼️' : '📝';
+                    const origemIcon = ad.origem === 'painel' ? '☁️' : '💾';
+                    const statusIcon = ad.ativo ? '🟢' : '🔴';
+                    
+                    const adInfo = `${statusIcon} *ID:* ${ad.id}\n` +
+                                  `⏰ *Intervalo:* ${ad.intervalo} min\n` +
+                                  `${tipoIcon} *Tipo:* ${ad.tipo} ${origemIcon}\n` +
+                                  `📝 *Mensagem:* ${ad.mensagem.substring(0, 60)}${ad.mensagem.length > 60 ? '...' : ''}\n` +
+                                  `📅 *Criado:* ${new Date(ad.criado).toLocaleDateString('pt-BR')}\n` +
+                                  `━━━━━━━━━━━━━━━━━━\n\n`;
 
-                if (ad.ativo) {
-                    listTextAtivos += adInfo;
-                    countAtivos++;
-                } else {
-                    listTextInativos += adInfo;
-                    countInativos++;
+                    if (ad.ativo) {
+                        listTextAtivos += adInfo;
+                        countAtivos++;
+                    } else {
+                        listTextInativos += adInfo;
+                        countInativos++;
+                    }
+                } catch (err) {
+                    console.error(`[LISTADS] Erro ao formatar anúncio:`, err);
                 }
             });
 
-            let finalText = `📢 *ANÚNCIOS DO GRUPO:*\n\n`;
+            let finalText = `📢 *ANÚNCIOS DO GRUPO*\n\n`;
             
             if (countAtivos > 0) {
                 finalText += `✅ *ATIVOS (${countAtivos}):*\n\n${listTextAtivos}`;
@@ -184,13 +219,15 @@ class AdsHandler {
                 finalText += `⏸️ *INATIVOS (${countInativos}):*\n\n${listTextInativos}`;
             }
 
-            finalText += `📊 *Total:* ${countAtivos + countInativos} anúncios\n☁️ Painel | 💾 Local`;
+            finalText += `📊 *Total:* ${totalAds} anúncios\n`;
+            finalText += `🔍 *Fontes:* ☁️ Painel (${panelAds.length}) | 💾 Local (${Object.keys(localAds).length})`;
 
             await message.reply(finalText);
+            console.log(`📊 [LISTADS] Listagem enviada com sucesso - ${totalAds} anúncios`);
 
         } catch (error) {
-            console.error('Erro ao listar anúncios:', error);
-            await message.reply('❌ Erro ao listar anúncios. Verifique os logs.');
+            console.error('[LISTADS] Erro crítico ao listar anúncios:', error);
+            await message.reply('❌ *Erro ao listar anúncios*\n\n🔍 Verifique os logs para mais detalhes.\n💡 Tente novamente em alguns segundos.');
         }
     }
 
@@ -203,48 +240,65 @@ class AdsHandler {
         }
 
         try {
+            console.log(`[RMADS] Iniciando remoção do anúncio: ${adId} no grupo: ${groupId}`);
+            
+            // Limpar cache antes da remoção
+            this.clearCacheForGroup(groupId);
+            
             let removed = false;
             let origin = '';
+            let errorMessage = '';
 
             // Verificar se é um anúncio do painel (panel_X) ou local (local_X)
             if (adId.startsWith('panel_')) {
                 const panelId = adId.replace('panel_', '');
+                console.log(`[RMADS] Removendo anúncio do painel: ${panelId}`);
                 const result = await this.removeAdFromPanel(panelId);
                 if (result.success) {
                     removed = true;
-                    origin = 'painel';
+                    origin = 'painel ☁️';
+                } else {
+                    errorMessage = result.error || 'Erro desconhecido';
                 }
             } else if (adId.startsWith('local_')) {
                 const localId = adId.replace('local_', '');
+                console.log(`[RMADS] Removendo anúncio local: ${localId}`);
                 const result = await this.removeLocalAd(groupId, localId);
                 if (result.success) {
                     removed = true;
-                    origin = 'local';
+                    origin = 'local 💾';
+                } else {
+                    errorMessage = result.error || 'Erro desconhecido';
                 }
             } else {
                 // Tentar remover como ID local (compatibilidade)
+                console.log(`[RMADS] Tentando remover como anúncio local (compatibilidade): ${adId}`);
                 const result = await this.removeLocalAd(groupId, adId);
                 if (result.success) {
                     removed = true;
-                    origin = 'local';
+                    origin = 'local 💾 (compatibilidade)';
+                } else {
+                    errorMessage = result.error || 'Anúncio não encontrado';
                 }
             }
 
             if (removed) {
-                await message.reply(`✅ *Anúncio removido!*\n\n🗑️ ID: ${adId}\n📍 Origem: ${origin}\n\n🔄 *Sincronizado automaticamente*`);
+                console.log(`[RMADS] Anúncio ${adId} removido com sucesso - Origem: ${origin}`);
+                await message.reply(`✅ *Anúncio removido com sucesso!*\n\n🗑️ *ID:* ${adId}\n📍 *Origem:* ${origin}\n🔄 *Status:* Sincronizado automaticamente`);
             } else {
-                await message.reply('❌ *Anúncio não encontrado!*\n\n💡 Verifique o ID com !listads');
+                console.log(`[RMADS] Falha ao remover anúncio ${adId} - Erro: ${errorMessage}`);
+                await message.reply(`❌ *Anúncio não encontrado!*\n\n🔍 *ID:* ${adId}\n📝 *Erro:* ${errorMessage}\n\n💡 Use !listads para ver anúncios disponíveis\n🔧 Use o ID completo (ex: local_1 ou panel_2)`);
             }
 
         } catch (error) {
-            console.error('Erro ao remover anúncio:', error);
-            await message.reply('❌ Erro ao remover anúncio.');
+            console.error('[RMADS] Erro crítico ao remover anúncio:', error);
+            await message.reply('❌ *Erro interno ao remover anúncio*\n\n🔍 Verifique os logs do sistema\n💡 Tente novamente em alguns segundos');
         }
     }
 
     static async showStatus(client, message, groupId) {
         try {
-            const panelAds = await this.fetchAdsFromPanel(groupId);
+            const panelAds = await this.fetchAdsFromPanelCached(groupId);
             const localAds = await this.getLocalAds(groupId);
             const activeIntervals = Array.from(this.intervals.keys()).filter(key => key.startsWith(groupId)).length;
 
@@ -262,32 +316,107 @@ class AdsHandler {
         }
     }
 
-    // Métodos auxiliares aprimorados
+    // Métodos auxiliares otimizados
+
+    static async fetchAdsFromPanelCached(groupId) {
+        const cacheKey = `panel_ads_${groupId}`;
+        const now = Date.now();
+        
+        // Verificar se existe cache válido
+        if (this.panelCache.has(cacheKey) && this.cacheExpiry.has(cacheKey)) {
+            const expiry = this.cacheExpiry.get(cacheKey);
+            if (now < expiry) {
+                console.log(`[CACHE] Usando cache para grupo ${groupId}`);
+                return this.panelCache.get(cacheKey);
+            }
+        }
+
+        // Buscar dados atualizados
+        const ads = await this.fetchAdsFromPanel(groupId);
+        
+        // Salvar no cache
+        this.panelCache.set(cacheKey, ads);
+        this.cacheExpiry.set(cacheKey, now + this.CACHE_DURATION);
+        
+        return ads;
+    }
 
     static async fetchAdsFromPanel(groupId) {
         try {
+            console.log(`[API] Buscando anúncios do painel para grupo: ${groupId}`);
+            
+            if (!config.laravelApi?.enabled) {
+                console.log(`[API] API do painel desabilitada`);
+                return [];
+            }
+
             const response = await axios.get(`${config.laravelApi.baseUrl}/ads`, {
                 headers: {
                     'Authorization': `Bearer ${config.laravelApi.token}`,
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'User-Agent': 'WhatsApp-Bot/2.0'
                 },
-                timeout: 5000
+                timeout: 15000, // Aumentado para 15 segundos
+                maxRedirects: 3,
+                validateStatus: function (status) {
+                    return status >= 200 && status < 300;
+                }
             });
 
-            const ads = response.data.data || response.data || [];
-            return Array.isArray(ads) ? ads.filter(ad => ad.group_id === groupId) : [];
+            let ads = [];
+            
+            // Tratamento robusto da resposta
+            if (response.data) {
+                if (Array.isArray(response.data)) {
+                    ads = response.data;
+                } else if (response.data.data && Array.isArray(response.data.data)) {
+                    ads = response.data.data;
+                } else if (response.data.ads && Array.isArray(response.data.ads)) {
+                    ads = response.data.ads;
+                }
+            }
+
+            // Filtrar por grupo com tratamento de erro
+            const filteredAds = ads.filter(ad => {
+                try {
+                    return ad && (ad.group_id === groupId || ad.groupId === groupId);
+                } catch (err) {
+                    console.warn(`[API] Erro ao filtrar anúncio:`, err);
+                    return false;
+                }
+            });
+
+            console.log(`[API] Encontrados ${filteredAds.length} anúncios do painel para grupo ${groupId}`);
+            return filteredAds;
+
         } catch (error) {
-            console.error('Erro ao buscar anúncios do painel:', error.message);
+            const status = error.response?.status || 'N/A';
+            const statusText = error.response?.statusText || 'N/A';
+            console.error(`[API] Erro ao buscar anúncios do painel - Status: ${status} (${statusText}), Erro: ${error.message}`);
+            
+            // Em caso de erro, retornar array vazio mas logar detalhes
+            if (error.code === 'ECONNREFUSED') {
+                console.error(`[API] Conexão recusada - Painel pode estar offline`);
+            } else if (error.code === 'ETIMEDOUT') {
+                console.error(`[API] Timeout - Painel demorou para responder`);
+            }
+            
             return [];
         }
     }
 
     static async getLocalAds(groupId) {
         try {
+            console.log(`[LOCAL] Buscando anúncios locais para grupo: ${groupId}`);
+            
             const ads = await DataManager.loadData('ads.json');
-            return ads.anuncios && ads.anuncios[groupId] ? ads.anuncios[groupId] : {};
+            const localAds = ads.anuncios && ads.anuncios[groupId] ? ads.anuncios[groupId] : {};
+            
+            console.log(`[LOCAL] Encontrados ${Object.keys(localAds).length} anúncios locais para grupo ${groupId}`);
+            return localAds;
+            
         } catch (error) {
-            console.error('Erro ao buscar anúncios locais:', error.message);
+            console.error('[LOCAL] Erro ao buscar anúncios locais:', error.message);
             return {};
         }
     }
@@ -311,32 +440,50 @@ class AdsHandler {
 
     static async removeLocalAd(groupId, adId) {
         try {
+            console.log(`[REMOVE-LOCAL] Tentando remover anúncio local ${adId} do grupo ${groupId}`);
+            
             const ads = await DataManager.loadData('ads.json');
             
             if (!ads.anuncios || !ads.anuncios[groupId] || !ads.anuncios[groupId][adId]) {
+                console.log(`[REMOVE-LOCAL] Anúncio ${adId} não encontrado no grupo ${groupId}`);
+                console.log(`[REMOVE-LOCAL] Anúncios disponíveis no grupo:`, Object.keys(ads.anuncios?.[groupId] || {}));
                 return { success: false, error: 'Anúncio não encontrado' };
             }
 
             // Guardar dados do anúncio antes de remover
             const adData = ads.anuncios[groupId][adId];
+            console.log(`[REMOVE-LOCAL] Anúncio encontrado:`, { id: adData.id, mensagem: adData.mensagem?.substring(0, 50) });
 
             // Parar intervalo
             const intervalKey = `${groupId}_${adId}`;
             if (this.intervals.has(intervalKey)) {
                 clearInterval(this.intervals.get(intervalKey));
                 this.intervals.delete(intervalKey);
+                console.log(`[REMOVE-LOCAL] Timer ${intervalKey} parado`);
+            } else {
+                console.log(`[REMOVE-LOCAL] Timer ${intervalKey} não estava ativo`);
             }
 
             // Remover do arquivo
             delete ads.anuncios[groupId][adId];
             await DataManager.saveData('ads.json', ads);
+            console.log(`[REMOVE-LOCAL] Anúncio ${adId} removido do arquivo`);
 
             // Tentar sincronizar remoção com o painel
-            await this.syncAdWithDatabase(groupId, adData, 'delete');
+            try {
+                const syncResult = await this.syncAdWithDatabase(groupId, adData, 'delete');
+                if (syncResult.success) {
+                    console.log(`[REMOVE-LOCAL] Sincronização com painel bem-sucedida`);
+                } else {
+                    console.log(`[REMOVE-LOCAL] Falha na sincronização com painel:`, syncResult.error);
+                }
+            } catch (syncError) {
+                console.log(`[REMOVE-LOCAL] Erro na sincronização com painel:`, syncError.message);
+            }
 
             return { success: true };
         } catch (error) {
-            console.error('Erro ao remover anúncio local:', error.message);
+            console.error('[REMOVE-LOCAL] Erro crítico ao remover anúncio local:', error);
             return { success: false, error: error.message };
         }
     }
@@ -371,24 +518,49 @@ class AdsHandler {
         this.intervals.set(intervalKey, intervalId);
     }
 
-    // Carregar anúncios ao iniciar o bot
+    // Carregar anúncios ao iniciar o bot (otimizado)
     static async loadAllAds(client) {
         try {
+            console.log('📢 [INIT] Iniciando carregamento de anúncios...');
+            
             const ads = await DataManager.loadData('ads.json');
+            let totalLoaded = 0;
+            let activeLoaded = 0;
             
             if (ads.anuncios) {
-                Object.keys(ads.anuncios).forEach(groupId => {
-                    Object.values(ads.anuncios[groupId]).forEach(ad => {
-                        if (ad.ativo) {
-                            this.startAdInterval(client, groupId, ad.id, ad);
+                // Processar grupos em paralelo para melhor performance
+                const groupPromises = Object.keys(ads.anuncios).map(async (groupId) => {
+                    const groupAds = ads.anuncios[groupId];
+                    let groupActive = 0;
+                    
+                    Object.values(groupAds).forEach(ad => {
+                        totalLoaded++;
+                        if (ad && ad.ativo && ad.id && ad.intervalo) {
+                            try {
+                                this.startAdInterval(client, groupId, ad.id, ad);
+                                activeLoaded++;
+                                groupActive++;
+                            } catch (err) {
+                                console.error(`[INIT] Erro ao iniciar anúncio ${ad.id}:`, err);
+                            }
                         }
                     });
+                    
+                    if (groupActive > 0) {
+                        console.log(`[INIT] Grupo ${groupId}: ${groupActive} anúncios ativos carregados`);
+                    }
                 });
+                
+                await Promise.all(groupPromises);
             }
 
-            console.log('📢 Anúncios automáticos carregados');
+            console.log(`📢 [INIT] Anúncios carregados: ${activeLoaded}/${totalLoaded} ativos`);
+            
+            // Limpar cache na inicialização
+            this.clearAllCache();
+            
         } catch (error) {
-            console.error('Erro ao carregar anúncios:', error);
+            console.error('❌ [INIT] Erro ao carregar anúncios:', error);
         }
     }
 
@@ -466,6 +638,19 @@ class AdsHandler {
             console.error(`[ADS-SYNC] ❌ Erro ao sincronizar anúncio ID ${adData.id} (${action}). Status: ${status}. Erro: ${message}`);
             return { success: false, error: message };
         }
+    }
+
+    static clearCacheForGroup(groupId) {
+        const cacheKey = `panel_ads_${groupId}`;
+        this.panelCache.delete(cacheKey);
+        this.cacheExpiry.delete(cacheKey);
+        console.log(`[CACHE] Cache limpo para grupo ${groupId}`);
+    }
+
+    static clearAllCache() {
+        this.panelCache.clear();
+        this.cacheExpiry.clear();
+        console.log(`[CACHE] Todo cache limpo`);
     }
 }
 

@@ -404,12 +404,18 @@ client.on('ready', async () => {
     Logger.success('Módulo de envio centralizado inicializado');
     
     // Carregar sistemas automáticos em paralelo para ser mais rápido
+    console.log('🔄 Iniciando carregamento de sistemas automáticos...');
+    const startTime = Date.now();
+    
     await Promise.all([
-        adsHandler.loadAllAds(client),
-        groupControlHandler.loadSchedules(client),
-        horariosHandler.loadAutoHours(client),
-        loadNotifiedUsers()
+        adsHandler.loadAllAds(client).catch(err => console.error('Erro ao carregar anúncios:', err)),
+        groupControlHandler.loadSchedules(client).catch(err => console.error('Erro ao carregar agendamentos:', err)),
+        horariosHandler.loadAutoHours(client).catch(err => console.error('Erro ao carregar horários:', err)),
+        loadNotifiedUsers().catch(err => console.error('Erro ao carregar usuários notificados:', err))
     ]);
+    
+    const loadTime = Date.now() - startTime;
+    console.log(`⚡ Sistemas automáticos carregados em ${loadTime}ms`);
     
     Logger.success('Sistemas automáticos inicializados');
     
