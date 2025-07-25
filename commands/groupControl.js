@@ -1,5 +1,4 @@
 const { DataManager, Utils } = require('../index');
-const { sincronizarGrupoComPainel } = require('../utils/SyncUtils');
 const moment = require('moment-timezone');
 
 class GroupControlHandler {
@@ -74,10 +73,6 @@ class GroupControlHandler {
             // Salvar configuração
             await DataManager.saveConfig(groupId, 'horarioAbertura', horario);
             
-            // Sincronizar com o painel
-            // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
-            await sincronizarGrupoComPainel(groupId, DataManager);
-            
             // Agendar tarefa
             this.scheduleTask(client, groupId, horario, 'open');
             
@@ -98,10 +93,6 @@ class GroupControlHandler {
         try {
             // Salvar configuração
             await DataManager.saveConfig(groupId, 'horarioFechamento', horario);
-            
-            // Sincronizar com o painel
-            // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
-            await sincronizarGrupoComPainel(groupId, DataManager);
             
             // Agendar tarefa
             this.scheduleTask(client, groupId, horario, 'close');

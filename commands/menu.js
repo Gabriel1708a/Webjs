@@ -1,68 +1,78 @@
-// commands/menu.js - Menu Principal do Bot
-const moment = require('moment-timezone');
-const Sender = require('../utils/Sender'); // Importar Sender para envios seguros
+const { DataManager, Utils } = require('../index');
 
-class MenuCommand {
-    static async execute(client, message, args) {
-        try {
-            const now = moment().tz('America/Sao_Paulo');
-            const greeting = this.getGreeting(now.hour());
-            
-            const menuText = `${greeting} *Seja bem-vindo!*\n\n` +
-                `🤖 *BOT ADMINISTRADOR DE GRUPOS*\n` +
-                `⏰ ${now.format('DD/MM/YYYY HH:mm')}\n\n` +
-                
-                `📢 *ANÚNCIOS:*\n` +
-                `• !addads mensagem|intervalo - Criar anúncio\n` +
-                `• !listads - Listar anúncios\n` +
-                `• !rmads ID - Remover anúncio\n` +
-                `• !statusads - Status dos anúncios\n\n` +
-                
-                `🛡️ *MODERAÇÃO:*\n` +
-                `• !ban - Banir usuário (responda msg)\n` +
-                `• !antilink 1/0 - Anti-link\n` +
-                `• !banfoto 1/0 - Banir fotos\n` +
-                `• !bangringo 1/0 - Banir gringos\n\n` +
-                
-                `🎰 *HORÁRIOS:*\n` +
-                `• !horarios - Mostrar horários\n` +
-                `• !horapg 1/0 - Ativar horários pagantes\n` +
-                `• !imagem-horarios - Definir imagem\n\n` +
-                
-                `🎉 *INTERAÇÃO:*\n` +
-                `• !sorteio prêmio|tempo - Criar sorteio\n` +
-                `• !bv 1/0 - Boas-vindas\n` +
-                `• !legendabv texto - Msg boas-vindas\n` +
-                `• !autoresposta 1/0 - Auto-resposta\n\n` +
-                
-                `⚙️ *CONTROLE:*\n` +
-                `• !abrir / !fechar - Controlar grupo\n` +
-                `• !allg - Marcar todos\n` +
-                `• !ping - Testar bot\n` +
-                `• !status - Status do sistema\n\n` +
-                
-                `🔧 *SISTEMA:*\n` +
-                `• !debug - Verificar configurações\n` +
-                `• !syncpanel - Sincronizar painel\n` +
-                `• !syncstatus - Status sincronização\n\n` +
-                
-                `💡 *Dica:* Use os comandos apenas se for administrador do grupo!\n\n` +
-                `📱 *Suporte:* Entre em contato com o desenvolvedor`;
+class MenuHandler {
+    static async handle(client, message, args) {
+        const menuText = `📋 *LISTA DE COMANDOS - BOT ADMIN*
 
-            await Sender.sendMessage(client, message.from, menuText);
-            
-        } catch (error) {
-            console.error('Erro no comando menu:', error);
-            await Sender.sendMessage(client, message.from, '❌ Erro ao exibir menu. Tente novamente.');
-        }
-    }
+🎯 *COMANDOS GERAIS:*
+📣 !all [mensagem] – Salva/envia mensagem para todos
+📤 !allg – Reposta mensagem mencionada para todos  
+📌 !allg2 – Igual !allg + mostra @ todos + fixa mensagem
+📋 !menu – Mostra esta lista
+✅ !vergrupo – Status do grupo
 
-    static getGreeting(hour) {
-        if (hour >= 5 && hour < 12) return '🌅';
-        if (hour >= 12 && hour < 18) return '☀️';
-        if (hour >= 18 && hour < 22) return '🌆';
-        return '🌙';
+🎮 *COMANDOS INTERATIVOS:*
+🍀 !sorte – Verificar sua sorte do dia
+💡 !conselhos – Receber conselho motivacional
+🎰 !horarios – Enviar dicas de apostas
+📋 !menu – Mostra esta lista
+
+🗞️ *ANÚNCIOS:*
+📢 !addads mensagem|intervalo – Criar anúncio
+📋 !listads – Listar anúncios
+🗑️ !rmads ID – Remover anúncio
+
+👋 *BOAS-VINDAS:*
+🔛 !bv 1/0 – Ativar/desativar
+✏️ !legendabv texto – Definir mensagem
+📝 Use @user e @group na mensagem
+
+🔐 *CONTROLE DE GRUPO:*
+🔓 !abrirgrupo – Abrir grupo agora
+🔒 !fechargrupo – Fechar grupo agora
+⏰ !abrirgp HH:MM – Agendar abertura
+⏰ !fechargp HH:MM – Agendar fechamento
+🚫 !afgp 0 – Cancelar agendamentos
+
+🤖 *AUTO-RESPOSTA IA:*
+🔛 !autoresposta 1/0 – Ativar/desativar IA
+🤖 Responde a: bom dia, boa tarde, boa noite
+💬 Responde quando chamam o nome do bot
+
+🎉 *SORTEIOS:*
+🎁 !sorteio prêmio|tempo – Criar sorteio
+⏱️ Tempo: 1m, 30s, 2h, etc.
+
+🕐 *HORÁRIOS PAGANTES:*
+🔛 !horapg 1/0 – Ativar/desativar
+⏰ !addhorapg 30m – Agendar próximo
+🖼️ !imagem-horarios – Definir imagem padrão
+
+🛡️ *SISTEMA DE PROTEÇÃO:*
+💣 !banextremo 1/0 – Ban por qualquer link
+🔗 !banlinkgp 1/0 – Ban por link de grupo
+🧹 !antilinkgp 1/0 – Só apagar link de grupo
+🗑️ !antilink 1/0 – Só apagar qualquer link
+📷 !banfoto 1/0 – Remover fotos/vídeos
+🇧🇷 !bangringo 1/0 – Ban números estrangeiros
+🔨 !ban – Banir (responder mensagem)
+🗑️ !apagar – Apagar mensagem (responder)
+
+🔒 *CONTROLE DE ACESSO:*
+👑 !soadm 1/0 – Modo só admin (comandos interativos)
+🔓 Quando ativado, apenas admins usam comandos interativos
+
+🔄 *SINCRONIZAÇÃO:*
+📊 !syncstatus – Status painel ↔ local
+
+━━━━━━━━━━━━━━━━━━━━━
+🤖 *Bot Admin v1.0*
+🔒 Sistema de segurança aprimorado
+🔄 Sistema de atualização automática
+✨ Gerencie seu grupo com facilidade!`;
+
+        await message.reply(menuText);
     }
 }
 
-module.exports = MenuCommand;
+module.exports = MenuHandler;

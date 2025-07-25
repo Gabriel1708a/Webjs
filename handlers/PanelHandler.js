@@ -2,7 +2,7 @@
 
 const express = require('express');
 const axios = require('axios');
-const Sender = require('../utils/Sender');
+const Sender = require('../Sender');
 
 class PanelHandler {
     static client;
@@ -183,60 +183,14 @@ class PanelHandler {
         
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                const response = await axios.post('https://painel.botwpp.tech/api/groups/confirm', groupData, {
+                await axios.post('https://painel.botwpp.tech/api/groups/confirm', groupData, {
                     timeout: 10000,
                     headers: {
                         'Content-Type': 'application/json',
                         'User-Agent': 'WhatsApp-Bot/1.0'
                     }
                 });
-
                 console.log(`[PanelHandler] ✅ Confirmação enviada ao painel com sucesso`);
-                console.log(`[PanelHandler] 🔍 Resposta completa do painel:`, JSON.stringify(response.data, null, 2));
-
-                // [NOVA LÓGICA MELHORADA] - Processar resposta e salvar panel_user_id
-                let panelUserId = null;
-                
-                // Tentar diferentes estruturas de resposta
-                if (response.data) {
-                    // Formato 1: response.data.data.panel_user_id
-                    if (response.data.data && response.data.data.panel_user_id) {
-                        panelUserId = response.data.data.panel_user_id;
-                    }
-                    // Formato 2: response.data.panel_user_id
-                    else if (response.data.panel_user_id) {
-                        panelUserId = response.data.panel_user_id;
-                    }
-                    // Formato 3: response.data.user_id (caso o Laravel retorne assim)
-                    else if (response.data.user_id) {
-                        panelUserId = response.data.user_id;
-                    }
-                }
-                
-                if (panelUserId) {
-                    console.log(`[PanelHandler] 🎯 panel_user_id recebido do painel: ${panelUserId}`);
-                    
-                    try {
-                        // Salva o ID do usuário recebido do painel no arquivo de configuração local do bot
-                        const { DataManager } = require('../index');
-                        await DataManager.saveConfig(groupData.group_id, 'panel_user_id', panelUserId);
-                        
-                        // Verificar se foi salvo corretamente
-                        const savedConfig = await DataManager.loadConfig(groupData.group_id);
-                        console.log(`[PanelHandler] 🔍 Configuração salva verificada:`, JSON.stringify(savedConfig, null, 2));
-                        
-                        console.log(`[PanelHandler] ✅ Grupo confirmado e panel_user_id (${panelUserId}) salvo localmente!`);
-                    } catch (saveError) {
-                        console.error(`[PanelHandler] ❌ Erro ao salvar panel_user_id: ${saveError.message}`);
-                    }
-                
-                } else {
-                    // Se a resposta não veio como esperado, registre um erro
-                    console.error('[PanelHandler] ⚠️ Confirmação enviada, mas a resposta da API não continha o panel_user_id.');
-                    console.error('[PanelHandler] 🔍 Formatos testados: data.panel_user_id, data.data.panel_user_id, data.user_id');
-                    console.log('[PanelHandler] 🔍 Estrutura da resposta:', JSON.stringify(response.data, null, 2));
-                }
-
                 return;
             } catch (error) {
                 console.warn(`[PanelHandler] Tentativa ${attempt} de envio ao painel falhou:`, error.message);

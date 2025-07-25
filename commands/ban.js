@@ -1,6 +1,5 @@
 const { DataManager, Utils } = require('../index');
 const axios = require('axios');
-const { sincronizarGrupoComPainel } = require('../utils/SyncUtils');
 
 /**
  * Busca as configurações de um grupo do painel via API.
@@ -61,13 +60,59 @@ function convertApiToLocal(apiConfig) {
 }
 
 /**
- * Função de sincronização antiga - substituída pela nova função correta
- * Agora usa sincronizarGrupoComPainel que envia para a rota force-sync
+ * Sincroniza configurações locais com o painel
+ * @param {string} groupId ID do grupo
+ * @param {string} configKey Chave da configuração
+ * @param {any} value Valor da configuração
  */
 async function syncToPanel(groupId, configKey, value) {
-    // Nova lógica: sincronizar todas as configurações do grupo de uma vez
-    // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
-    await sincronizarGrupoComPainel(groupId, DataManager);
+    try {
+        const apiUrl = process.env.PANEL_API_URL || 'https://seupainel.com/api';
+        const apiToken = process.env.PANEL_API_TOKEN || 'seu-token-aqui';
+        
+        // Mapear configurações locais para API
+        const apiData = {};
+        
+        if (configKey === 'antiLink') {
+            // Resetar todos os anti-link
+            apiData.ban_extremo = 0;
+            apiData.ban_link_gp = 0;
+            apiData.anti_link_gp = 0;
+            apiData.anti_link = 0;
+            
+            // Ativar o específico
+            switch (value) {
+                case 'banextremo':
+                    apiData.ban_extremo = 1;
+                    break;
+                case 'banlinkgp':
+                    apiData.ban_link_gp = 1;
+                    break;
+                case 'antilinkgp':
+                    apiData.anti_link_gp = 1;
+                    break;
+                case 'antilink':
+                    apiData.anti_link = 1;
+                    break;
+            }
+        } else if (configKey === 'banFoto') {
+            apiData.ban_foto = value ? 1 : 0;
+        } else if (configKey === 'banGringo') {
+            apiData.ban_gringo = value ? 1 : 0;
+        }
+        
+        await axios.post(`${apiUrl}/groups/${groupId}/settings`, apiData, {
+            headers: {
+                'Authorization': `Bearer ${apiToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log(`[SYNC] ✅ Configuração ${configKey} sincronizada com o painel`);
+    } catch (error) {
+        console.error(`[SYNC] ❌ Erro ao sincronizar com painel:`, error.message);
+    }
 }
 
 class BanHandler {
@@ -287,35 +332,14 @@ class BanHandler {
                 await message.delete(true);
                 
                 if (shouldBan) {
-                    try {
-                        const chat = await message.getChat();
-                        
-                        // Verificar se o usuário ainda está no grupo antes de tentar remover
-                        const participants = chat.participants;
-                        const userInGroup = participants.find(p => p.id._serialized === message.author);
-                        
-                        if (userInGroup) {
-                            await chat.removeParticipants([message.author]);
-                            await client.sendMessage(groupId, `🔨 *Usuário banido por ${reason}!*`);
-                        } else {
-                            await client.sendMessage(groupId, `⚠️ *Usuário já saiu do grupo. Mensagem removida por ${reason}*`);
-                        }
-                    } catch (banError) {
-                        console.log(`⚠️ Não foi possível banir usuário: ${banError.message}`);
-                        await client.sendMessage(groupId, `🗑️ *Mensagem removida: ${reason}* (Não foi possível banir usuário)`);
-                    }
+                    const chat = await message.getChat();
+                    await chat.removeParticipants([message.author]);
+                    await client.sendMessage(groupId, `🔨 *Usuário banido por ${reason}!*`);
                 } else {
                     await client.sendMessage(groupId, `🗑️ *Mensagem removida: ${reason}*`);
                 }
             } catch (error) {
-                console.log(`❌ Erro na moderação automática: ${error.message}`);
-                // Tentar pelo menos deletar a mensagem se possível
-                try {
-                    await message.delete(true);
-                    console.log('✅ Mensagem deletada com sucesso apesar do erro');
-                } catch (deleteError) {
-                    console.log(`⚠️ Não foi possível deletar mensagem: ${deleteError.message}`);
-                }
+                console.error('Erro na moderação automática:', error);
             }
         }
     }

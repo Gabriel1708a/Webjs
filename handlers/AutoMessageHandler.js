@@ -1,33 +1,34 @@
 const axios = require('axios');
-const Sender = require('../utils/Sender');
-const config = require('../config.json'); // Usar config centralizado
+const Sender = require('../Sender');
+
+// Suas configurações devem vir de um arquivo central
+const config = {
+    laravelApi: {
+        baseUrl: 'https://painel.botwpp.tech/api', // A base da sua API
+        token: 'teste' // O MESMO TOKEN DO ARQUIVO .env
+    }
+};
 
 class AutoMessageHandler {
     static activeMessages = new Map(); // Armazena as mensagens e seus timers
-    static localAdsTimers = new Map(); // Armazena timers dos anúncios locais
-    static DataManager = null; // Será injetado na inicialização
 
     /**
-     * Inicia o serviço híbrido, buscando mensagens do painel e fallback local.
-     * @param {object} dataManager - Instância do DataManager para acessar dados locais
+     * Inicia o serviço, buscando as mensagens e configurando os intervalos.
      */
-    static async initialize(dataManager = null) {
-        console.log('🔄 Iniciando serviço de mensagens automáticas híbrido v2.1 (rotas corrigidas)...');
-        
-        // Armazenar DataManager para uso posterior
-        this.DataManager = dataManager;
+    static async initialize() {
+        console.log('🔄 Iniciando serviço de mensagens automáticas...');
 
         // --- BINDING ---
+        // "Amarra" o 'this' da classe a cada função.
+        // Isso garante que, não importa como a função seja chamada,
+        // o 'this' sempre se referirá a 'AutoMessageHandler'.
         this.fetchMessagesFromPanel = this.fetchMessagesFromPanel.bind(this);
         this.syncMessages = this.syncMessages.bind(this);
         this.scheduleMessage = this.scheduleMessage.bind(this);
         this.sendMessage = this.sendMessage.bind(this);
-        this.loadLocalAds = this.loadLocalAds.bind(this);
-        this.scheduleLocalAd = this.scheduleLocalAd.bind(this);
-        this.sendLocalAd = this.sendLocalAd.bind(this);
 
-        // Iniciar busca híbrida com intervalo otimizado
-        setInterval(this.fetchMessagesFromPanel, config.sync.messagesInterval);
+        // Agora que o 'this' está garantido, podemos chamar com segurança.
+        setInterval(this.fetchMessagesFromPanel, 10 * 1000); 
         
         this.fetchMessagesFromPanel();
     }
@@ -35,67 +36,24 @@ class AutoMessageHandler {
 
 
     /**
-     * Busca mensagens do painel Laravel com fallback para anúncios locais.
+     * Busca as mensagens da API do Laravel.
      */
     static async fetchMessagesFromPanel() {
-        let panelMessages = [];
-        let panelError = false;
-
         try {
-            console.log('📡 Buscando mensagens do painel Laravel (nova rota /api/ads)...');
-            const response = await axios.get(`${config.laravelApi.baseUrl}/ads`, {
+            console.log('📡 Buscando mensagens do painel Laravel...');
+            const response = await axios.get(`${config.laravelApi.baseUrl}/messages/pending`, {
                 headers: {
                     'Authorization': `Bearer ${config.laravelApi.token}`,
                     'Accept': 'application/json'
-                },
-                timeout: config.laravelApi.timeout
+                }
             });
 
-            // [CORREÇÃO] Verificar o formato da resposta do Laravel
-            let messages = response.data;
-            
-            // Se a resposta tem um wrapper, extrair o array
-            if (messages && typeof messages === 'object' && !Array.isArray(messages)) {
-                if (messages.data && Array.isArray(messages.data)) {
-                    messages = messages.data;
-                } else if (messages.messages && Array.isArray(messages.messages)) {
-                    messages = messages.messages;
-                } else if (messages.ads && Array.isArray(messages.ads)) {
-                    messages = messages.ads;
-                } else {
-                    console.warn('⚠️ Formato de resposta inesperado do painel:', Object.keys(messages));
-                    panelError = true;
-                }
-            }
-
-            // Verificar se é um array válido
-            if (!Array.isArray(messages)) {
-                console.error('❌ Resposta do painel não é um array válido:', typeof messages, messages);
-                panelError = true;
-            } else {
-                panelMessages = messages;
-                console.log(`✅ ${messages.length} mensagens do painel encontradas.`);
-            }
+            const messages = response.data;
+            console.log(`✅ ${messages.length} mensagens encontradas. Sincronizando...`);
+            this.syncMessages(messages);
 
         } catch (error) {
             console.error('❌ Erro ao buscar mensagens do painel:', error.response?.data || error.message);
-            panelError = true;
-        }
-
-        // [SISTEMA HÍBRIDO] Se painel falhou ou está vazio, usar anúncios locais
-        if (panelError || panelMessages.length === 0) {
-            // [OTIMIZAÇÃO] Só carregar anúncios locais se não estiverem já carregados
-            if (this.localAdsTimers.size === 0 && config.localAds.enabled) {
-                console.log('🔄 Painel indisponível ou vazio. Carregando anúncios locais como fallback...');
-                await this.loadLocalAds();
-            } else {
-                console.log('📂 Painel indisponível, mas anúncios locais já estão rodando.');
-            }
-        } else {
-            // Painel funcionando - sincronizar mensagens do painel
-            this.syncMessages(panelMessages);
-            // Parar anúncios locais se estiverem rodando
-            this.stopLocalAds();
         }
     }
 
@@ -104,12 +62,6 @@ class AutoMessageHandler {
      * @param {Array} panelMessages - Array de mensagens da API.
      */
     static syncMessages(panelMessages) {
-        // [CORREÇÃO] Verificação adicional de segurança
-        if (!Array.isArray(panelMessages)) {
-            console.error('❌ syncMessages: panelMessages não é um array válido:', typeof panelMessages, panelMessages);
-            return;
-        }
-
         console.log('[DEBUG] Iniciando a sincronização. Mensagens ativas no momento:', this.activeMessages.size);
         const panelMessageIds = new Set(panelMessages.map(m => m.id));
 
@@ -172,7 +124,7 @@ class AutoMessageHandler {
             return;
         }
 
-        if (isNew && config.sync?.sendNewImmediately) {
+        if (isNew) {
             console.log(`[DEBUG] É nova. Enviando imediatamente...`);
             this.sendMessage(messageData); 
         }
@@ -255,7 +207,7 @@ class AutoMessageHandler {
      */
     static async markAsSentInPanel(messageId) {
         try {
-            await axios.post(`${config.laravelApi.baseUrl}/ads/${messageId}/sent`, {}, {
+            await axios.post(`${config.laravelApi.baseUrl}/messages/${messageId}/sent`, {}, {
                 headers: {
                     'Authorization': `Bearer ${config.laravelApi.token}`
                 }
@@ -263,127 +215,6 @@ class AutoMessageHandler {
             console.log(`📈 Status de envio atualizado no painel para a mensagem ID: ${messageId}`);
         } catch (error) {
             console.error(`❌ Falha ao atualizar status no painel para a mensagem ID ${messageId}:`, error.response?.data || error.message);
-        }
-    }
-
-    // ========================================
-    // MÉTODOS PARA ANÚNCIOS LOCAIS (FALLBACK)
-    // ========================================
-
-    /**
-     * Carrega e agenda anúncios locais do ads.json (otimizado)
-     */
-    static async loadLocalAds() {
-        if (!this.DataManager) {
-            console.warn('⚠️ DataManager não disponível. Não é possível carregar anúncios locais.');
-            return;
-        }
-
-        try {
-            if (config.logging?.enableSyncLogs) {
-                console.log('📂 Carregando anúncios locais do ads.json...');
-            }
-            const adsData = await this.DataManager.loadData(config.localAds?.dataFile || 'ads.json');
-            
-            if (!adsData.anuncios) {
-                console.log('📭 Nenhum anúncio local encontrado.');
-                return;
-            }
-
-            let totalActiveAds = 0;
-
-            // [OTIMIZAÇÃO] Processar anúncios de forma mais eficiente
-            for (const [groupId, groupAds] of Object.entries(adsData.anuncios)) {
-                const activeAds = Object.values(groupAds).filter(ad => ad.ativo);
-                
-                if (activeAds.length > 0) {
-                    // [OTIMIZAÇÃO] Log resumido para não poluir console
-                    totalActiveAds += activeAds.length;
-                    
-                    // Agendar anúncios em lote
-                    activeAds.forEach(ad => this.scheduleLocalAd(groupId, ad));
-                }
-            }
-
-            console.log(`✅ Total de ${totalActiveAds} anúncios locais agendados como fallback.`);
-
-        } catch (error) {
-            console.error('❌ Erro ao carregar anúncios locais:', error.message);
-        }
-    }
-
-    /**
-     * Agenda um anúncio local específico
-     * @param {string} groupId - ID do grupo
-     * @param {object} adData - Dados do anúncio
-     */
-    static scheduleLocalAd(groupId, adData) {
-        const adKey = `${groupId}_${adData.id}`;
-        
-        // Se já existe timer para este anúncio, limpar primeiro
-        if (this.localAdsTimers.has(adKey)) {
-            clearInterval(this.localAdsTimers.get(adKey));
-        }
-
-        const intervalMs = adData.intervalo * 60 * 1000; // Converter minutos para ms
-        
-        // [OTIMIZAÇÃO] Log reduzido para melhor performance
-        // console.log(`⏰ Agendando anúncio local ID ${adData.id} para grupo ${groupId} (${adData.intervalo} min)`);
-
-        // [CORREÇÃO] NÃO enviar imediatamente - apenas agendar
-        // Agendar envios recorrentes
-        const timerId = setInterval(() => {
-            this.sendLocalAd(groupId, adData);
-        }, intervalMs);
-
-        this.localAdsTimers.set(adKey, timerId);
-    }
-
-    /**
-     * Envia um anúncio local
-     * @param {string} groupId - ID do grupo
-     * @param {object} adData - Dados do anúncio
-     */
-    static async sendLocalAd(groupId, adData) {
-        try {
-            // [OTIMIZAÇÃO] Log reduzido para melhor performance
-            // console.log(`📢 Enviando anúncio local ID ${adData.id} para grupo ${groupId}`);
-            
-            let mediaUrl = null;
-            if (adData.media && adData.media.data) {
-                // Converter dados de mídia para URL temporária se necessário
-                // TODO: Implementar conversão de dados base64 para URL se necessário
-                mediaUrl = null; // Por enquanto, sem mídia
-            }
-
-            const success = await Sender.sendMessage(
-                groupId,
-                adData.mensagem,
-                mediaUrl
-            );
-
-            // [OTIMIZAÇÃO] Log apenas em caso de erro
-            if (!success) {
-                console.log(`❌ Falha ao enviar anúncio local ID ${adData.id} para grupo ${groupId}`);
-            }
-
-        } catch (error) {
-            console.error(`❌ Erro ao enviar anúncio local ID ${adData.id}:`, error.message);
-        }
-    }
-
-    /**
-     * Para todos os timers de anúncios locais
-     */
-    static stopLocalAds() {
-        if (this.localAdsTimers.size > 0) {
-            console.log(`🛑 Parando ${this.localAdsTimers.size} anúncios locais (painel disponível)`);
-            
-            for (const timerId of this.localAdsTimers.values()) {
-                clearInterval(timerId);
-            }
-            
-            this.localAdsTimers.clear();
         }
     }
 }

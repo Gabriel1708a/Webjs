@@ -1,5 +1,4 @@
 const { DataManager, Utils } = require('../index');
-const { sincronizarGrupoComPainel } = require('../utils/SyncUtils');
 
 class WelcomeHandler {
     static async handle(client, message, command, args) {
@@ -19,10 +18,6 @@ class WelcomeHandler {
                 }
 
                 await DataManager.saveConfig(groupId, 'boasVindas', status);
-                
-                // Sincronizar com o painel
-                // [CORREÇÃO] Passa o objeto DataManager para a função de sincronização
-                await sincronizarGrupoComPainel(groupId, DataManager);
                 
                 if (status === 1) {
                     await message.reply('✅ *Boas-vindas ativadas!*\n\n💡 Configure a mensagem com !legendabv\n📷 Envie foto/vídeo com !legendabv para boas-vindas com mídia');
