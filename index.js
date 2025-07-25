@@ -311,6 +311,15 @@ class DataManager {
 class RentalSystem {
     static async checkGroupStatus(groupId) {
         try {
+            // TEMPORÁRIO: Permitir todos os grupos para debug
+            console.log(`[DEBUG-RENTAL] Verificando grupo: ${groupId}`);
+            return { 
+                active: true, 
+                reason: 'debug_mode',
+                message: 'Grupo ativo (modo debug)'
+            };
+            
+            /* CÓDIGO ORIGINAL COMENTADO PARA DEBUG
             const rentals = await DataManager.loadData('grupoAluguel.json');
             
             if (!rentals.grupos || !rentals.grupos[groupId]) {
@@ -320,7 +329,9 @@ class RentalSystem {
                     reason: 'not_registered'
                 };
             }
+            */
 
+            /* RESTO DO CÓDIGO ORIGINAL COMENTADO PARA DEBUG
             const groupData = rentals.grupos[groupId];
             const now = moment();
             const expiry = moment(groupData.expiry);
@@ -341,6 +352,7 @@ class RentalSystem {
                 expiry: expiry.format('DD/MM/YYYY HH:mm'),
                 reason: 'active'
             };
+            */
         } catch (error) {
             Logger.error(`Erro ao verificar status do grupo ${groupId}: ${error.message}`);
             return { active: true, reason: 'error' }; // Permitir uso em caso de erro
@@ -488,6 +500,9 @@ client.on('ready', async () => {
         `⏰ Conectado em: ${moment().format('DD/MM/YYYY HH:mm:ss')}`
     ], 'green');
     
+    // Log de debug para eventos
+    console.log('[DEBUG] Eventos de mensagem configurados: message_create e message');
+    
     // Importar módulos após cliente estar pronto (carregamento otimizado)
     console.log('📦 Carregando módulos de comandos...');
     const moduleStartTime = Date.now();
@@ -587,12 +602,16 @@ client.on('disconnected', (reason) => {
 // 📨 PROCESSAMENTO DE MENSAGENS OTIMIZADO
 // ========================================================================================================
 
-client.on('message', async (message) => {
+// Função para processar mensagens (unificada)
+async function processMessage(message) {
     try {
         const startTime = Date.now();
         
         // Ignorar mensagens do próprio bot
         if (message.fromMe) return;
+        
+        // Debug log para verificar se mensagens estão chegando
+        console.log(`[DEBUG] Mensagem recebida de: ${message.from}, corpo: "${message.body?.substring(0, 50)}..."`);
 
         // Verificar se é mensagem privada
         if (!message.from.includes('@g.us')) {
@@ -616,7 +635,10 @@ client.on('message', async (message) => {
 
         // Verificar status do grupo (otimizado com cache)
         const groupStatus = await RentalSystem.checkGroupStatus(groupId);
+        console.log(`[DEBUG] Status do grupo ${groupId}: ${groupStatus.active ? 'ATIVO' : 'INATIVO'} - Razão: ${groupStatus.reason}`);
+        
         if (!groupStatus.active && !Utils.isOwner(message)) {
+            console.log(`[DEBUG] Grupo bloqueado - enviando mensagem de erro`);
             await message.reply(groupStatus.message);
             return;
         }
@@ -978,7 +1000,11 @@ client.on('message', async (message) => {
             Logger.error(`Erro ao enviar mensagem de erro: ${replyError.message}`);
         }
     }
-});
+}
+
+// Configurar eventos de mensagem (duplo para garantir compatibilidade)
+client.on('message_create', processMessage);
+client.on('message', processMessage);
 
 // ========================================================================================================
 // 🚀 INICIALIZAÇÃO DO BOT
