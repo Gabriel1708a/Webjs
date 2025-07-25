@@ -14,7 +14,8 @@
     "retryDelay": 2000,
     "maxConcurrentRequests": 5,
     "cacheEnabled": true,
-    "cacheDuration": 30000
+    "cacheDuration": 30000,
+    "maxRetries": 3
   },
   "sync": {
     "adsInterval": 30000,
