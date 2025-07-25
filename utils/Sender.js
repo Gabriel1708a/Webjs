@@ -1,5 +1,5 @@
 // utils/Sender.js - Sistema de Envio de Mensagens Otimizado
-// Versão: 2.3 - CORREÇÃO CRÍTICA validateAndGetParts + Ultra-Robustez FINAL
+// Versão: 2.4 - CORREÇÃO CRÍTICA validateAndGetParts + Ultra-Robustez FINAL + VERSÃO 3.3
 
 const { MessageMedia } = require('whatsapp-web.js');
 const axios = require('axios');
