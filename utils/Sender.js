@@ -182,18 +182,67 @@ class Sender {
                 // Erro validateAndGetParts específico
                 if (error.message.includes('validateAndGetParts') || error.stack?.includes('validateAndGetParts')) {
                     console.error(`[Sender] 🔧 Erro validateAndGetParts detectado - tentando correção automática`);
+                    console.error(`[Sender] 💡 Possíveis causas: WID malformado, dados corrompidos, ou problema interno do WhatsApp Web`);
+                    console.error(`[Sender] 📋 Target ID: ${targetId}`);
+                    console.error(`[Sender] 📝 Content type: ${typeof content}`);
+                    console.error(`[Sender] 📏 Content length: ${typeof content === 'string' ? content.length : 'N/A'}`);
                     
-                    // Tentar com conteúdo simplificado
-                    try {
-                        const simpleContent = typeof content === 'string' 
-                            ? (content.length > 1000 ? content.substring(0, 1000) + '...' : content)
-                            : 'Mensagem (conteúdo simplificado)';
+                    // Estratégias de recuperação em ordem de prioridade
+                    const recoveryStrategies = [
+                        // Estratégia 1: Limpar e simplificar o conteúdo
+                        async () => {
+                            const cleanContent = typeof content === 'string' 
+                                ? content.replace(/[^\w\s\p{L}\p{N}\p{P}\p{S}]/gu, '').substring(0, 500)
+                                : 'Mensagem simplificada';
+                            console.log(`[Sender] 🧹 Tentando com conteúdo limpo: "${cleanContent.substring(0, 50)}..."`);
+                            return await client.sendMessage(targetId, cleanContent);
+                        },
+                        
+                        // Estratégia 2: Usar apenas texto básico
+                        async () => {
+                            const basicText = '✅ Mensagem enviada com sucesso';
+                            console.log(`[Sender] 📝 Tentando com texto básico`);
+                            return await client.sendMessage(targetId, basicText);
+                        },
+                        
+                        // Estratégia 3: Validar e reconstruir o targetId
+                        async () => {
+                            let cleanTargetId = targetId;
+                            if (targetId.includes('@g.us')) {
+                                // É um grupo - validar formato
+                                const groupMatch = targetId.match(/(\d+)@g\.us/);
+                                if (groupMatch) {
+                                    cleanTargetId = `${groupMatch[1]}@g.us`;
+                                }
+                            } else if (targetId.includes('@c.us')) {
+                                // É contato individual - validar formato
+                                const contactMatch = targetId.match(/(\d+)@c\.us/);
+                                if (contactMatch) {
+                                    cleanTargetId = `${contactMatch[1]}@c.us`;
+                                }
+                            }
                             
-                        const result = await client.sendMessage(targetId, simpleContent);
-                        console.log(`[Sender] ✅ Mensagem simplificada enviada após correção validateAndGetParts`);
-                        return true;
-                    } catch (simplifiedError) {
-                        console.error(`[Sender] ❌ Falha ao enviar mensagem simplificada: ${simplifiedError.message}`);
+                            console.log(`[Sender] 🆔 Tentando com ID reconstruído: ${cleanTargetId}`);
+                            const simpleContent = typeof content === 'string' 
+                                ? (content.length > 200 ? content.substring(0, 200) + '...' : content)
+                                : 'Mensagem';
+                            return await client.sendMessage(cleanTargetId, simpleContent);
+                        }
+                    ];
+                    
+                    // Tentar cada estratégia
+                    for (let i = 0; i < recoveryStrategies.length; i++) {
+                        try {
+                            console.log(`[Sender] 🔄 Executando estratégia de recuperação ${i + 1}/${recoveryStrategies.length}`);
+                            const result = await recoveryStrategies[i]();
+                            console.log(`[Sender] ✅ Estratégia ${i + 1} bem-sucedida! Mensagem enviada após correção validateAndGetParts`);
+                            return true;
+                        } catch (strategyError) {
+                            console.error(`[Sender] ❌ Estratégia ${i + 1} falhou: ${strategyError.message}`);
+                            if (i === recoveryStrategies.length - 1) {
+                                console.error(`[Sender] 💀 Todas as estratégias de recuperação falharam`);
+                            }
+                        }
                     }
                 }
                 

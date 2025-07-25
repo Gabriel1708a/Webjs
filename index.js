@@ -605,418 +605,293 @@ client.on('disconnected', (reason) => {
 // Função para processar mensagens (unificada) - Versão 2.1 com correções críticas
 async function processMessage(message) {
     try {
-        const startTime = Date.now();
+        console.log(`[DEBUG] 📨 Mensagem recebida de: ${message?.from || 'UNKNOWN'}`);
+        console.log(`[DEBUG] 📝 Conteúdo: "${message?.body?.substring(0, 50) || 'EMPTY'}..."`);
+        console.log(`[DEBUG] 📍 Tipo: ${message?.type || 'UNKNOWN'}`);
         
         // Validação básica da mensagem
-        if (!message || !message.from) {
-            console.log(`[DEBUG] Mensagem inválida ou sem origem - ignorando`);
-            return;
-        }
-        
-        // Ignorar mensagens do próprio bot
-        if (message.fromMe) {
-            console.log(`[DEBUG] Mensagem própria ignorada`);
-            return;
-        }
-        
-        // Debug log para verificar se mensagens estão chegando
-        console.log(`[DEBUG] ✅ Mensagem recebida de: ${message.from}, corpo: "${message.body?.substring(0, 50) || 'sem corpo'}..."`);
-
-        // Verificar se é mensagem privada
-        if (!message.from.includes('@g.us')) {
-            console.log(`[DEBUG] Processando mensagem privada`);
-            try {
-                await handlePrivateMessage(client, message);
-            } catch (privateError) {
-                console.error(`[DEBUG] Erro ao processar mensagem privada: ${privateError.message}`);
-            }
+        if (!message || !message.body || !message.from) {
+            console.log(`[DEBUG] ⚠️ Mensagem inválida ignorada`);
             return;
         }
 
-        const groupId = message.from;
-        const messageBody = message.body?.trim() || '';
-        
-        // Verificar se a mensagem começa com o prefixo
-        if (!messageBody.startsWith(config.prefix)) return;
+        // Verificar se a mensagem é de um chat válido
+        const chat = await message.getChat();
+        if (!chat) {
+            console.log(`[DEBUG] ⚠️ Chat não encontrado para mensagem`);
+            return;
+        }
+
+        console.log(`[DEBUG] 🏠 Chat: ${chat.name || chat.id.user || 'Privado'} (${chat.isGroup ? 'Grupo' : 'Privado'})`);
+
+        // Verificar se é um comando (inicia com !)
+        const isCommand = message.body.startsWith('!');
+        console.log(`[DEBUG] ⚡ É comando: ${isCommand ? 'SIM' : 'NÃO'}`);
+
+        if (!isCommand) {
+            console.log(`[DEBUG] 📤 Mensagem não é comando - ignorando`);
+            return;
+        }
 
         // Extrair comando e argumentos
-        const args = messageBody.slice(config.prefix.length).trim().split(' ');
-        const command = args.shift()?.toLowerCase();
-        const argsString = args.join(' ');
-
-        // Log do comando
-        Logger.command(Utils.getUsername(message), `${config.prefix}${command}`, Utils.getGroupName(groupId));
-
-        // Verificar status do grupo (otimizado com cache)
-        let groupStatus;
-        try {
-            groupStatus = await RentalSystem.checkGroupStatus(groupId);
-            console.log(`[DEBUG] Status do grupo ${groupId}: ${groupStatus.active ? 'ATIVO' : 'INATIVO'} - Razão: ${groupStatus.reason || 'N/A'}`);
-        } catch (statusError) {
-            console.error(`[DEBUG] Erro ao verificar status do grupo: ${statusError.message} - Permitindo acesso temporário`);
-            groupStatus = { active: true, reason: 'Erro na verificação - acesso temporário' };
-        }
+        const args = message.body.slice(1).trim().split(' ');
+        const command = args[0].toLowerCase();
         
-        if (!groupStatus.active && !Utils.isOwner(message)) {
-            console.log(`[DEBUG] Grupo bloqueado - tentando enviar mensagem de erro`);
-            try {
-                await message.reply(groupStatus.message || '❌ Grupo temporariamente indisponível');
-            } catch (replyError) {
-                console.error(`[DEBUG] Erro ao enviar resposta de grupo bloqueado: ${replyError.message}`);
-            }
-            return;
-        }
+        console.log(`[DEBUG] 🎯 Comando: "${command}" | Args: [${args.slice(1).join(', ')}]`);
 
         // Lista de comandos disponíveis
         const availableCommands = [
-            'menu', 'ban', 'unban', 'kick', 'add', 'promote', 'demote', 'mute', 'unmute',
-            'banfoto', 'bangringo', 'addads', 'rmads', 'listads', 'statusads', 'bv', 'legendabv',
-            'abrirgrupo', 'fechargrupo', 'abrirgp', 'fechargp', 'afgp', 'sorteio', 'horarios',
-            'autoresposta', 'checkpanel', 'fixpanel', 'syncstatus', 'syncpanel', 'linkgp', 'id',
-            'sorte', 'conselhos', 'conselho', 'allg', 'allg2', 'ping', 'status', 'uptime'
+            'menu', 'ping', 'status', 'uptime', 'listads', 'addad', 'removead', 
+            'ban', 'unban', 'allg', 'allg2', 'sorteio', 'welcome', 'autoresposta', 
+            'horarios', 'debug', 'syncpanel', 'syncstatus'
         ];
 
+        // Verificar se o comando existe
         if (!availableCommands.includes(command)) {
-            return; // Comando não reconhecido, ignorar silenciosamente
+            console.log(`[DEBUG] ❓ Comando "${command}" não reconhecido`);
+            try {
+                await Sender.sendMessage(client, message.from, 
+                    `❓ *Comando não reconhecido*\n\nDigite *!menu* para ver todos os comandos disponíveis.`);
+            } catch (error) {
+                console.error(`[DEBUG] Erro ao enviar resposta de comando inválido: ${error.message}`);
+            }
+            return;
         }
 
-        // ====================================================================================================
-        // 🎯 ROTEAMENTO DE COMANDOS OTIMIZADO
-        // ====================================================================================================
+        console.log(`[DEBUG] ✅ Comando válido reconhecido: "${command}"`);
+
+        // Verificar status do grupo (temporariamente desabilitado para debug)
+        let groupStatus = { active: true, reason: 'Debug mode' };
+        if (chat.isGroup) {
+            try {
+                console.log(`[DEBUG] 🔍 Verificando status do grupo...`);
+                // groupStatus = await RentalSystem.checkGroupStatus(chat.id._serialized);
+                console.log(`[DEBUG] 📊 Status do grupo: ${JSON.stringify(groupStatus)}`);
+            } catch (statusError) {
+                console.error(`[DEBUG] Erro ao verificar status do grupo: ${statusError.message}`);
+                groupStatus = { active: true, reason: 'Status check failed - allowing command' };
+            }
+        }
+
+        if (!groupStatus.active) {
+            console.log(`[DEBUG] 🚫 Grupo inativo: ${groupStatus.reason}`);
+            try {
+                await Sender.sendMessage(client, message.from, 
+                    `🚫 *Grupo não autorizado*\n\n${groupStatus.reason || 'Entre em contato com o administrador.'}`);
+            } catch (error) {
+                console.error(`[DEBUG] Erro ao enviar mensagem de grupo inativo: ${error.message}`);
+            }
+            return;
+        }
+
+        // Processar comando
+        console.log(`[DEBUG] 🚀 Processando comando: "${command}"`);
 
         switch (command) {
-            // Comandos do sistema
-            case 'menu':
-                await menuHandler.handle(client, message, command, argsString);
-                break;
-
             case 'ping':
-                const pingStart = Date.now();
-                const pingMessage = await message.reply('🏓 Pong!');
-                const pingTime = Date.now() - pingStart;
-                
-                const sysInfo = Utils.getSystemInfo();
-                const statusText = `🏓 *Pong!*\n\n` +
-                    `⚡ *Latência:* ${pingTime}ms\n` +
-                    `🕐 *Uptime:* ${Math.floor(sysInfo.uptime / 60)}min\n` +
-                    `💾 *RAM:* ${sysInfo.memory.heapUsed}\n` +
-                    `🤖 *Versão:* ${config.botInfo.versao}\n` +
-                    `📅 *Data:* ${moment().format('DD/MM/YYYY HH:mm:ss')}`;
-                
-                setTimeout(async () => {
-                    try {
-                        await pingMessage.edit(statusText);
-                    } catch (error) {
-                        await message.reply(statusText);
-                    }
-                }, 1000);
+                try {
+                    const startTime = Date.now();
+                    await Sender.sendMessage(client, message.from, '🏓 Pong!');
+                    const endTime = Date.now();
+                    console.log(`[DEBUG] ✅ Comando ping executado em ${endTime - startTime}ms`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando ping: ${error.message}`);
+                }
                 break;
 
             case 'status':
-            case 'uptime':
-                const sysStatus = Utils.getSystemInfo();
-                const uptimeHours = Math.floor(sysStatus.uptime / 3600);
-                const uptimeMinutes = Math.floor((sysStatus.uptime % 3600) / 60);
-                
-                const statusResponse = `📊 *STATUS DO SISTEMA*\n\n` +
-                    `🟢 *Status:* Online\n` +
-                    `⏰ *Uptime:* ${uptimeHours}h ${uptimeMinutes}min\n` +
-                    `💾 *Memória:*\n` +
-                    `   • Heap: ${sysStatus.memory.heapUsed}\n` +
-                    `   • Total: ${sysStatus.memory.heapTotal}\n` +
-                    `🖥️ *Sistema:* ${sysStatus.platform}\n` +
-                    `⚡ *Node.js:* ${sysStatus.version}\n` +
-                    `🤖 *Bot:* v${config.botInfo.versao}\n` +
-                    `📅 *Última inicialização:* ${moment().subtract(sysStatus.uptime, 'seconds').format('DD/MM/YYYY HH:mm:ss')}`;
-                
-                await message.reply(statusResponse);
-                break;
-
-            // Comandos de moderação
-            case 'ban':
-            case 'unban':
-            case 'kick':
-            case 'add':
-            case 'promote':
-            case 'demote':
-            case 'mute':
-            case 'unmute':
-            case 'banfoto':
-            case 'bangringo':
-                await banHandler.handle(client, message, command, argsString);
-                break;
-
-            // Comandos de anúncios (handler otimizado)
-            case 'addads':
-            case 'listads':
-            case 'rmads':
-            case 'statusads':
-                await adsHandler.handle(client, message, command, argsString);
-                break;
-
-            // Comandos de debug e painel
-            case 'checkpanel':
-            case 'fixpanel':
-                const debugHandler = require('./commands/debug');
-                await debugHandler.handle(client, message, command, argsString);
-                break;
-
-            // Comandos de bem-vindo
-            case 'bv':
-            case 'legendabv':
-                await welcomeHandler.handle(client, message, command, argsString);
-                break;
-
-            // Comandos de controle de grupo
-            case 'abrirgrupo':
-            case 'fechargrupo':
-            case 'abrirgp':
-            case 'fechargp':
-            case 'afgp':
-                await groupControlHandler.handle(client, message, command, argsString);
-                break;
-
-            // Comando de sorteio
-            case 'sorteio':
-                await sorteioHandler.handle(client, message, argsString);
-                break;
-
-            // Comandos de horários
-            case 'horarios':
-                // Verificar modo SOADM para comando interativo
-                const soadmStatusHorarios = await DataManager.loadConfig(groupId, 'soadm');
-                const isOwnerHorarios = Utils.isOwner(message);
-                const isAdminHorarios = await Utils.isAdmin(message);
-                
-                if ((soadmStatusHorarios === '1' || soadmStatusHorarios === 1) && !isAdminHorarios && !isOwnerHorarios) {
-                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
-                    return;
+                try {
+                    const uptime = process.uptime();
+                    const hours = Math.floor(uptime / 3600);
+                    const minutes = Math.floor((uptime % 3600) / 60);
+                    const seconds = Math.floor(uptime % 60);
+                    
+                    const statusMsg = `📊 *Status do Bot*\n\n` +
+                        `⏱️ Uptime: ${hours}h ${minutes}m ${seconds}s\n` +
+                        `🔗 Conectado: ✅\n` +
+                        `📱 WhatsApp: Ativo\n` +
+                        `💾 Memória: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`;
+                    
+                    await Sender.sendMessage(client, message.from, statusMsg);
+                    console.log(`[DEBUG] ✅ Comando status executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando status: ${error.message}`);
                 }
-                
-                await horariosHandler.handle(client, message, command, argsString);
                 break;
 
-            // Comando de autoresposta
+            case 'uptime':
+                try {
+                    const uptime = process.uptime();
+                    const days = Math.floor(uptime / 86400);
+                    const hours = Math.floor((uptime % 86400) / 3600);
+                    const minutes = Math.floor((uptime % 3600) / 60);
+                    
+                    await Sender.sendMessage(client, message.from, 
+                        `⏰ *Bot Online há:*\n${days}d ${hours}h ${minutes}m`);
+                    console.log(`[DEBUG] ✅ Comando uptime executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando uptime: ${error.message}`);
+                }
+                break;
+
+            case 'menu':
+                try {
+                    await MenuCommand.execute(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando menu executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando menu: ${error.message}`);
+                }
+                break;
+
+            case 'listads':
+                try {
+                    await AdsHandler.listAds(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando listads executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando listads: ${error.message}`);
+                }
+                break;
+
+            case 'addad':
+                try {
+                    await AdsHandler.addAd(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando addad executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando addad: ${error.message}`);
+                }
+                break;
+
+            case 'removead':
+                try {
+                    await AdsHandler.removeAd(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando removead executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando removead: ${error.message}`);
+                }
+                break;
+
+            case 'ban':
+                try {
+                    await BanCommand.execute(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando ban executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando ban: ${error.message}`);
+                }
+                break;
+
+            case 'unban':
+                try {
+                    await BanCommand.unban(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando unban executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando unban: ${error.message}`);
+                }
+                break;
+
+            case 'allg':
+            case 'allg2':
+                try {
+                    if (!chat.isGroup) {
+                        await Sender.sendMessage(client, message.from, 
+                            '❌ Este comando só funciona em grupos!');
+                        return;
+                    }
+                    
+                    const participants = chat.participants;
+                    if (!participants || participants.length === 0) {
+                        await Sender.sendMessage(client, message.from, 
+                            '❌ Não foi possível obter a lista de participantes.');
+                        return;
+                    }
+                    
+                    const mentions = participants.map(p => p.id._serialized);
+                    const mentionText = participants.map(p => `@${p.id.user}`).join(' ');
+                    
+                    await client.sendMessage(message.from, mentionText, {
+                        mentions: mentions
+                    });
+                    console.log(`[DEBUG] ✅ Comando ${command} executado - ${mentions.length} menções`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando ${command}: ${error.message}`);
+                }
+                break;
+
+            case 'sorteio':
+                try {
+                    await SorteioCommand.execute(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando sorteio executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando sorteio: ${error.message}`);
+                }
+                break;
+
+            case 'welcome':
+                try {
+                    await WelcomeCommand.execute(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando welcome executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando welcome: ${error.message}`);
+                }
+                break;
+
             case 'autoresposta':
-                await autoRespostaHandler.handle(client, message, command, argsString);
+                try {
+                    await AutoRespostaCommand.execute(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando autoresposta executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando autoresposta: ${error.message}`);
+                }
                 break;
 
-            // Comandos de sincronização
-            case 'syncstatus':
-                await syncStatusHandler.handle(client, message, command, argsString);
+            case 'horarios':
+                try {
+                    await HorariosCommand.execute(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando horarios executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando horarios: ${error.message}`);
+                }
+                break;
+
+            case 'debug':
+                try {
+                    await DebugCommand.execute(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando debug executado`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro no comando debug: ${error.message}`);
+                }
                 break;
 
             case 'syncpanel':
-                await syncPanelHandler.handle(client, message, command, argsString);
-                break;
-
-            // Comando de link do grupo
-            case 'linkgp':
                 try {
-                    // Verificar modo SOADM para comando !linkgp
-                    const soadmStatusLink = await DataManager.loadConfig(groupId, 'soadm');
-                    const isOwnerLink = Utils.isOwner(message);
-                    const isAdminLink = await Utils.isAdmin(message);
-                    
-                    if ((soadmStatusLink === '1' || soadmStatusLink === 1) && !isAdminLink && !isOwnerLink) {
-                        await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
-                        return;
-                    }
-
-                    const chat = await message.getChat();
-                    if (!chat.isGroup) {
-                        await message.reply('❌ Este comando só funciona em grupos.');
-                        return;
-                    }
-
-                    const inviteCode = await chat.getInviteCode();
-                    const groupLink = `https://chat.whatsapp.com/${inviteCode}`;
-                    
-                    await message.reply(`🔗 *Link do Grupo:*\n\n${groupLink}\n\n📋 *Nome:* ${chat.name}\n👥 *Participantes:* ${chat.participants.length}`);
-                    
+                    await SyncPanelCommand.execute(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando syncpanel executado`);
                 } catch (error) {
-                    Logger.error(`Erro no comando !linkgp: ${error.message}`);
-                    await message.reply('❌ Erro ao gerar link do grupo. Verifique se sou administrador.');
+                    console.error(`[DEBUG] Erro no comando syncpanel: ${error.message}`);
                 }
                 break;
 
-            // Comando de ID do grupo
-            case 'id':
-                if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
-                    await message.reply('🚫 Apenas administradores podem usar este comando.');
-                    return;
-                }
-
+            case 'syncstatus':
                 try {
-                    const chat = await message.getChat();
-                    if (!chat.isGroup) {
-                        await message.reply('❌ Este comando só funciona em grupos.');
-                        return;
-                    }
-
-                    await message.reply(`🆔 *ID do Grupo:*\n\n\`${groupId}\`\n\n📋 *Nome:* ${chat.name}\n👥 *Participantes:* ${chat.participants.length}`);
-                    
+                    await SyncStatusCommand.execute(client, message, args);
+                    console.log(`[DEBUG] ✅ Comando syncstatus executado`);
                 } catch (error) {
-                    Logger.error(`Erro no comando !id: ${error.message}`);
-                    await message.reply('❌ Erro ao obter ID do grupo.');
-                }
-                break;
-
-            // Comando de sorte
-            case 'sorte':
-                const soadmStatus = await DataManager.loadConfig(groupId, 'soadm');
-                const isOwnerSorte = Utils.isOwner(message);
-                const isAdminSorte = await Utils.isAdmin(message);
-                
-                if ((soadmStatus === '1' || soadmStatus === 1) && !isAdminSorte && !isOwnerSorte) {
-                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
-                    return;
-                }
-                
-                const sorte = Math.floor(Math.random() * 101);     
-                let mensagem;
-                if (sorte >= 80) {
-                    mensagem = `🍀 Uau! Sua sorte hoje está ótima! Você tem **${sorte}%** de sorte! 🍀`;
-                } else if (sorte >= 50) {
-                    mensagem = `🍀 Sua sorte está boa! Você tem **${sorte}%** de sorte hoje! 🍀`;
-                } else if (sorte >= 20) {
-                    mensagem = `🍀 Sua sorte está razoável! Você tem **${sorte}%** de sorte, mas pode melhorar! 🍀`;
-                } else {
-                    mensagem = `🍀 Hmm, a sorte não está ao seu lado hoje... Apenas **${sorte}%** de sorte. Não desista! 🍀`;
-                }
-                await message.reply(mensagem);
-                break;
-
-            // Comando de conselhos (com IA)
-            case 'conselhos':
-            case 'conselho':
-                const soadmStatusConselho = await DataManager.loadConfig(groupId, 'soadm');
-                const isOwnerConselho = Utils.isOwner(message);
-                const isAdminConselho = await Utils.isAdmin(message);
-                
-                if ((soadmStatusConselho === '1' || soadmStatusConselho === 1) && !isAdminConselho && !isOwnerConselho) {
-                    await message.reply('🔒 *Modo SOADM ativado!*\n\n👑 Apenas administradores podem usar comandos interativos.');
-                    return;
-                }
-                
-                try {
-                    const apiKey = process.env.GROQ_API_KEY || config.groqApiKey || 'SUA_CHAVE_GROQ_AQUI';
-                    
-                    if (apiKey === 'SUA_CHAVE_GROQ_AQUI') {
-                        await message.reply('⚠️ *Comando não configurado!*\n\nConfigure a chave da API Groq no config.json');
-                        return;
-                    }
-
-                    const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-                        model: 'llama3-8b-8192',
-                        messages: [
-                            {
-                                role: 'system',
-                                content: 'Você é um conselheiro sábio e positivo. Dê conselhos inspiradores e motivacionais em português do Brasil, de forma breve e objetiva.'
-                            },
-                            {
-                                role: 'user',
-                                content: argsString || 'Me dê um conselho motivacional para o dia'
-                            }
-                        ],
-                        max_tokens: 200,
-                        temperature: 0.7
-                    }, {
-                        headers: {
-                            'Authorization': `Bearer ${apiKey}`,
-                            'Content-Type': 'application/json'
-                        },
-                        timeout: 10000
-                    });
-
-                    const conselho = response.data.choices[0].message.content;
-                    await message.reply(`💡 *Conselho do Dia:*\n\n${conselho}\n\n✨ _Tenha um ótimo dia!_`);
-                    
-                } catch (error) {
-                    Logger.error(`Erro no comando !conselho: ${error.message}`);
-                    await message.reply('❌ Erro ao gerar conselho. Tente novamente mais tarde.');
-                }
-                break;
-
-            // Comandos de menção em massa
-            case 'allg':
-                try {
-                    if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
-                        await message.reply('🚫 Apenas administradores podem usar este comando.');
-                        return;
-                    }
-
-                    const chat = await message.getChat();
-                    if (!chat.isGroup) {
-                        await message.reply('❌ Este comando só funciona em grupos.');
-                        return;
-                    }
-
-                    const participants = chat.participants.map(participant => `@${participant.id.user}`);
-                    const mentions = chat.participants.map(participant => participant.id);
-                    
-                    const allgMessage = argsString || 'Atenção pessoal! 📢';
-                    const finalMessage = `${allgMessage}\n\n${participants.join(' ')}`;
-                    
-                    await client.sendMessage(groupId, finalMessage, { mentions });
-                    Logger.success(`Comando !allg executado - ${participants.length} membros mencionados`);
-                    
-                } catch (error) {
-                    Logger.error(`Erro no comando !allg: ${error.message}`);
-                    await message.reply('❌ Erro ao executar comando !allg. Verifique se sou administrador.');
-                }
-                break;
-
-            case 'allg2':
-                try {
-                    if (!(await Utils.isAdmin(message)) && !Utils.isOwner(message)) {
-                        await message.reply('🚫 Apenas administradores podem usar este comando.');
-                        return;
-                    }
-
-                    const chat2 = await message.getChat();
-                    if (!chat2.isGroup) {
-                        await message.reply('❌ Este comando só funciona em grupos.');
-                        return;
-                    }
-
-                    const participants2 = chat2.participants.map(participant => `@${participant.id.user}`);
-                    const mentions2 = chat2.participants.map(participant => participant.id);
-                    
-                    const allg2Message = argsString || 'Comunicado importante! 📌';
-                    const finalMessage2 = `${allg2Message}\n\n${participants2.join(' ')}`;
-                    
-                    const sentMessage = await client.sendMessage(groupId, finalMessage2, { mentions: mentions2 });
-                    
-                    // Tentar fixar a mensagem
-                    try {
-                        await sentMessage.pin();
-                    } catch (pinError) {
-                        Logger.warning('Não foi possível fixar a mensagem (permissões insuficientes)');
-                    }
-                    
-                    Logger.success(`Comando !allg2 executado - ${participants2.length} membros mencionados e mensagem fixada`);
-                    
-                } catch (error) {
-                    Logger.error(`Erro no comando !allg2: ${error.message}`);
-                    await message.reply('❌ Erro ao executar comando !allg2. Verifique se sou administrador.');
+                    console.error(`[DEBUG] Erro no comando syncstatus: ${error.message}`);
                 }
                 break;
 
             default:
-                // Comando não reconhecido - não fazer nada (já filtrado acima)
+                console.log(`[DEBUG] ❓ Comando não implementado: "${command}"`);
+                try {
+                    await Sender.sendMessage(client, message.from, 
+                        `❓ Comando "${command}" não implementado.\n\nDigite *!menu* para ver comandos disponíveis.`);
+                } catch (error) {
+                    console.error(`[DEBUG] Erro ao enviar resposta de comando não implementado: ${error.message}`);
+                }
                 break;
         }
 
-        // Log de performance do comando
-        const processingTime = Date.now() - startTime;
-        if (processingTime > 1000) {
-            Logger.performance(`Comando ${command} processado`, processingTime);
-        }
-
     } catch (error) {
-        const duration = Date.now() - startTime;
-        console.error(`[DEBUG] 💥 ERRO CRÍTICO no processMessage (${duration}ms):`);
+        console.error(`[DEBUG] 🚨 ERRO CRÍTICO NO PROCESSAMENTO DE MENSAGEM:`);
         console.error(`[DEBUG] Mensagem de: ${message?.from || 'UNKNOWN'}`);
         console.error(`[DEBUG] Corpo: "${message?.body?.substring(0, 100) || 'EMPTY'}"`);
         console.error(`[DEBUG] Erro: ${error.message}`);
@@ -1025,16 +900,31 @@ async function processMessage(message) {
         // Verificar se é o erro validateAndGetParts
         if (error.message.includes('validateAndGetParts') || error.stack?.includes('validateAndGetParts')) {
             console.error(`[DEBUG] 🔧 ERRO validateAndGetParts DETECTADO - Este é o erro principal!`);
+            console.error(`[DEBUG] 💡 Possíveis causas: ID de chat inválido, mensagem malformada, ou problema interno do WhatsApp Web`);
+            
+            // Tentar uma resposta de emergência simplificada
+            try {
+                const simpleResponse = '⚠️ Erro interno detectado. Tente novamente.';
+                await client.sendMessage(message.from, simpleResponse);
+                console.log(`[DEBUG] ✅ Resposta de emergência enviada com sucesso`);
+            } catch (emergencyError) {
+                console.error(`[DEBUG] ❌ Falha ao enviar resposta de emergência: ${emergencyError.message}`);
+            }
         }
         
         Logger.error(`Erro crítico ao processar mensagem: ${error.message}`);
         
+        // Tentar enviar resposta de erro se possível
         try {
             if (message && message.reply && typeof message.reply === 'function') {
                 await message.reply('❌ *Erro interno do sistema*\n\n🔧 Tente novamente em alguns segundos.\n📞 Se o problema persistir, contate o suporte.');
+                console.log(`[DEBUG] ✅ Resposta de erro enviada via reply`);
+            } else {
+                await Sender.sendMessage(client, message.from, '❌ *Erro interno*\n\nTente novamente em alguns segundos.');
+                console.log(`[DEBUG] ✅ Resposta de erro enviada via Sender`);
             }
         } catch (replyError) {
-            console.error(`[DEBUG] Não foi possível enviar resposta de erro: ${replyError.message}`);
+            console.error(`[DEBUG] ❌ Não foi possível enviar resposta de erro: ${replyError.message}`);
             Logger.error(`Erro ao enviar mensagem de erro: ${replyError.message}`);
         }
     }

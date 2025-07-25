@@ -1,149 +1,148 @@
 #!/usr/bin/env node
-// fix-critical-errors.js - Script para corrigir erros críticos do bot
-// Versão: 1.0 - Correção de validateAndGetParts e limpeza de dados
-
+// Versão: 2.0 - Correção crítica de validateAndGetParts e problemas de sessão
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
-console.log('🔧 INICIANDO CORREÇÃO DE ERROS CRÍTICOS...\n');
+console.log('🚨 SCRIPT DE CORREÇÃO CRÍTICA DE ERROS - v2.0');
+console.log('='.repeat(60));
 
-// 1. Verificar e corrigir arquivos de dados corrompidos
-function fixDataFiles() {
-    console.log('📁 Verificando arquivos de dados...');
+// Função para log com timestamp
+function log(message, type = 'info') {
+    const timestamp = new Date().toLocaleString('pt-BR');
+    const icons = {
+        info: 'ℹ️',
+        success: '✅',
+        warning: '⚠️',
+        error: '❌',
+        fix: '🔧'
+    };
+    console.log(`[${timestamp}] ${icons[type]} ${message}`);
+}
+
+// 1. Verificar e limpar sessão corrompida
+function cleanCorruptedSession() {
+    log('Verificando sessão do WhatsApp Web...', 'info');
     
-    const dataDir = './data';
-    if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir);
-        console.log('✅ Pasta data criada');
+    const sessionPath = path.join(__dirname, '.wwebjs_auth');
+    const cachePath = path.join(__dirname, '.wwebjs_cache');
+    
+    if (fs.existsSync(sessionPath)) {
+        log('Removendo sessão antiga...', 'fix');
+        try {
+            fs.rmSync(sessionPath, { recursive: true, force: true });
+            log('Sessão removida com sucesso', 'success');
+        } catch (error) {
+            log(`Erro ao remover sessão: ${error.message}`, 'error');
+        }
     }
     
-    const requiredFiles = [
-        { file: 'ads.json', content: { "anuncios": {} } },
-        { file: 'configs.json', content: {} },
-        { file: 'grupoAluguel.json', content: { "grupos": {} } },
-        { file: 'notifiedUsers.json', content: {} }
+    if (fs.existsSync(cachePath)) {
+        log('Removendo cache antigo...', 'fix');
+        try {
+            fs.rmSync(cachePath, { recursive: true, force: true });
+            log('Cache removido com sucesso', 'success');
+        } catch (error) {
+            log(`Erro ao remover cache: ${error.message}`, 'error');
+        }
+    }
+}
+
+// 2. Verificar e corrigir arquivos de dados
+function validateDataFiles() {
+    log('Validando arquivos de dados...', 'info');
+    
+    const dataFiles = [
+        { path: 'data/ads.json', default: { anuncios: {} } },
+        { path: 'data/configs.json', default: {} },
+        { path: 'data/grupoAluguel.json', default: {} },
+        { path: 'data/notifiedUsers.json', default: {} }
     ];
     
-    for (const { file, content } of requiredFiles) {
-        const filePath = path.join(dataDir, file);
+    dataFiles.forEach(file => {
+        const filePath = path.join(__dirname, file.path);
+        const dirPath = path.dirname(filePath);
         
-        try {
-            if (fs.existsSync(filePath)) {
-                // Verificar se o arquivo é válido JSON
-                const data = fs.readFileSync(filePath, 'utf8');
-                JSON.parse(data);
-                console.log(`✅ ${file} - OK`);
-            } else {
-                // Criar arquivo se não existir
-                fs.writeFileSync(filePath, JSON.stringify(content, null, 2));
-                console.log(`🆕 ${file} - Criado`);
-            }
-        } catch (error) {
-            // Arquivo corrompido - recriar
-            fs.writeFileSync(filePath, JSON.stringify(content, null, 2));
-            console.log(`🔧 ${file} - Corrigido (estava corrompido)`);
+        // Criar diretório se não existir
+        if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true });
+            log(`Diretório criado: ${dirPath}`, 'fix');
         }
-    }
-}
-
-// 2. Limpar cache de sessão do WhatsApp
-function cleanWhatsAppSession() {
-    console.log('\n🧹 Limpando cache de sessão...');
-    
-    const sessionDirs = ['.wwebjs_auth', '.wwebjs_cache', 'session'];
-    
-    for (const dir of sessionDirs) {
-        if (fs.existsSync(dir)) {
+        
+        // Verificar se arquivo existe e é válido
+        if (!fs.existsSync(filePath)) {
+            log(`Criando arquivo: ${file.path}`, 'fix');
+            fs.writeFileSync(filePath, JSON.stringify(file.default, null, 2));
+        } else {
             try {
-                fs.rmSync(dir, { recursive: true, force: true });
-                console.log(`🗑️ Removido: ${dir}`);
+                const content = fs.readFileSync(filePath, 'utf8');
+                JSON.parse(content);
+                log(`Arquivo válido: ${file.path}`, 'success');
             } catch (error) {
-                console.log(`⚠️ Não foi possível remover ${dir}: ${error.message}`);
+                log(`Arquivo corrompido, recriando: ${file.path}`, 'fix');
+                fs.writeFileSync(filePath, JSON.stringify(file.default, null, 2));
             }
         }
-    }
+    });
 }
 
-// 3. Verificar e corrigir configurações
-function fixConfigurations() {
-    console.log('\n⚙️ Verificando configurações...');
+// 3. Atualizar dependências
+function updateDependencies() {
+    log('Verificando dependências...', 'info');
     
     try {
-        const configPath = './config.json';
-        if (fs.existsSync(configPath)) {
-            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-            
-            // Verificar configurações críticas
-            let modified = false;
-            
-            if (!config.laravelApi) {
-                config.laravelApi = {};
-                modified = true;
-            }
-            
-            if (!config.laravelApi.timeout || config.laravelApi.timeout < 15000) {
-                config.laravelApi.timeout = 15000;
-                modified = true;
-            }
-            
-            if (!config.laravelApi.maxRetries) {
-                config.laravelApi.maxRetries = 3;
-                modified = true;
-            }
-            
-            if (modified) {
-                fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-                console.log('✅ Configurações atualizadas');
-            } else {
-                console.log('✅ Configurações OK');
-            }
-        }
+        log('Executando npm install...', 'fix');
+        execSync('npm install', { stdio: 'inherit' });
+        log('Dependências atualizadas com sucesso', 'success');
     } catch (error) {
-        console.log(`⚠️ Erro ao verificar configurações: ${error.message}`);
+        log(`Erro ao atualizar dependências: ${error.message}`, 'error');
     }
 }
 
-// 4. Verificar dependências
-function checkDependencies() {
-    console.log('\n📦 Verificando dependências...');
+// 4. Verificar versão do WhatsApp Web.js
+function checkWhatsAppWebJsVersion() {
+    log('Verificando versão do whatsapp-web.js...', 'info');
     
     try {
-        const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
-        const nodeModules = fs.existsSync('./node_modules');
+        const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+        const currentVersion = packageJson.dependencies['whatsapp-web.js'];
+        log(`Versão atual: ${currentVersion}`, 'info');
         
-        if (!nodeModules) {
-            console.log('❌ node_modules não encontrado - execute: npm install');
+        // Verificar se é uma versão problemática
+        if (currentVersion.includes('1.18') || currentVersion.includes('1.19') || currentVersion.includes('1.20')) {
+            log('Versão potencialmente problemática detectada', 'warning');
+            log('Recomenda-se atualizar para versão 1.23.0 ou superior', 'warning');
+            
+            // Atualizar automaticamente
+            try {
+                log('Atualizando para versão estável...', 'fix');
+                execSync('npm install whatsapp-web.js@^1.23.0', { stdio: 'inherit' });
+                log('WhatsApp Web.js atualizado com sucesso', 'success');
+            } catch (updateError) {
+                log(`Erro ao atualizar: ${updateError.message}`, 'error');
+            }
         } else {
-            console.log('✅ node_modules encontrado');
+            log('Versão adequada detectada', 'success');
         }
-        
-        // Verificar whatsapp-web.js
-        const wwjsVersion = packageJson.dependencies['whatsapp-web.js'];
-        console.log(`📱 whatsapp-web.js: ${wwjsVersion}`);
-        
-        if (wwjsVersion.includes('1.23.0') || wwjsVersion.includes('^1.23')) {
-            console.log('✅ Versão do whatsapp-web.js atualizada');
-        } else {
-            console.log('⚠️ Considere atualizar whatsapp-web.js para v1.23.0+');
-        }
-        
     } catch (error) {
-        console.log(`⚠️ Erro ao verificar dependências: ${error.message}`);
+        log(`Erro ao verificar versão: ${error.message}`, 'error');
     }
 }
 
-// 5. Criar script de teste
-function createTestScript() {
-    console.log('\n🧪 Criando script de teste...');
+// 5. Criar script de teste de conexão
+function createConnectionTest() {
+    log('Criando script de teste de conexão...', 'fix');
     
-    const testScript = `#!/usr/bin/env node
-// test-bot-quick.js - Teste rápido do bot
+    const testScript = `
 const { Client, LocalAuth } = require('whatsapp-web.js');
 
-console.log('🚀 Iniciando teste rápido do bot...');
+console.log('🧪 TESTE DE CONEXÃO WHATSAPP WEB.JS');
+console.log('='.repeat(50));
 
 const client = new Client({
-    authStrategy: new LocalAuth(),
+    authStrategy: new LocalAuth({
+        clientId: 'test-connection'
+    }),
     puppeteer: {
         headless: true,
         args: [
@@ -153,6 +152,7 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
+            '--single-process',
             '--disable-gpu'
         ]
     }
@@ -163,9 +163,21 @@ client.on('qr', (qr) => {
 });
 
 client.on('ready', () => {
-    console.log('✅ Bot conectado com sucesso!');
-    console.log('🔧 Teste concluído - bot está funcionando');
-    process.exit(0);
+    console.log('✅ Cliente conectado com sucesso!');
+    console.log('🧪 Testando envio de mensagem...');
+    
+    // Teste básico sem validateAndGetParts
+    setTimeout(async () => {
+        try {
+            const info = await client.info;
+            console.log('📋 Informações do cliente:', info.wid.user);
+            console.log('✅ Teste concluído com sucesso!');
+            process.exit(0);
+        } catch (error) {
+            console.error('❌ Erro no teste:', error.message);
+            process.exit(1);
+        }
+    }, 5000);
 });
 
 client.on('auth_failure', (msg) => {
@@ -174,45 +186,89 @@ client.on('auth_failure', (msg) => {
 });
 
 client.on('disconnected', (reason) => {
-    console.log('📴 Bot desconectado:', reason);
+    console.log('🔌 Cliente desconectado:', reason);
     process.exit(1);
 });
 
-// Timeout de segurança
-setTimeout(() => {
-    console.log('⏰ Timeout do teste - encerrando');
-    process.exit(1);
-}, 60000);
-
+console.log('🚀 Iniciando teste de conexão...');
 client.initialize();
 `;
-
-    fs.writeFileSync('./test-bot-quick.js', testScript);
-    console.log('✅ Script de teste criado: test-bot-quick.js');
+    
+    fs.writeFileSync('test-connection-fix.js', testScript);
+    log('Script de teste criado: test-connection-fix.js', 'success');
 }
 
-// Executar todas as correções
-function main() {
-    try {
-        fixDataFiles();
-        fixConfigurations();
-        checkDependencies();
-        createTestScript();
+// 6. Verificar configurações do Puppeteer
+function checkPuppeteerConfig() {
+    log('Verificando configurações do Puppeteer...', 'info');
+    
+    const configPath = path.join(__dirname, 'index.js');
+    if (fs.existsSync(configPath)) {
+        const content = fs.readFileSync(configPath, 'utf8');
         
-        console.log('\n🎉 CORREÇÕES CONCLUÍDAS!');
+        // Verificar se as configurações anti-validateAndGetParts estão presentes
+        const requiredArgs = [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor'
+        ];
+        
+        let missingArgs = [];
+        requiredArgs.forEach(arg => {
+            if (!content.includes(arg)) {
+                missingArgs.push(arg);
+            }
+        });
+        
+        if (missingArgs.length > 0) {
+            log(`Argumentos do Puppeteer faltando: ${missingArgs.join(', ')}`, 'warning');
+            log('Estes argumentos podem ajudar a prevenir erros validateAndGetParts', 'info');
+        } else {
+            log('Configurações do Puppeteer adequadas', 'success');
+        }
+    }
+}
+
+// 7. Executar todas as correções
+async function runAllFixes() {
+    try {
+        log('Iniciando correções críticas...', 'info');
+        
+        cleanCorruptedSession();
+        validateDataFiles();
+        updateDependencies();
+        checkWhatsAppWebJsVersion();
+        createConnectionTest();
+        checkPuppeteerConfig();
+        
+        log('='.repeat(60), 'info');
+        log('🎉 TODAS AS CORREÇÕES CONCLUÍDAS!', 'success');
+        log('='.repeat(60), 'info');
+        
         console.log('\n📋 PRÓXIMOS PASSOS:');
-        console.log('1. Execute: npm install (se necessário)');
-        console.log('2. Execute: node test-bot-quick.js (para testar)');
-        console.log('3. Execute: node index.js (para iniciar o bot)');
-        console.log('\n💡 DICAS:');
+        console.log('1. Execute: node test-connection-fix.js');
+        console.log('2. Se o teste passar, execute: node index.js');
+        console.log('3. Escaneie o QR Code novamente');
+        console.log('4. Teste comandos básicos como !ping');
+        console.log('');
+        console.log('💡 DICAS PARA PREVENIR validateAndGetParts:');
+        console.log('- Mantenha o WhatsApp Web.js atualizado');
+        console.log('- Evite mensagens muito longas (>1000 caracteres)');
+        console.log('- Valide IDs de chat antes de enviar mensagens');
+        console.log('- Use try/catch em todas as operações de envio');
         console.log('- Se o erro validateAndGetParts persistir, é um problema interno do WhatsApp Web');
-        console.log('- Tente usar uma conta diferente ou aguardar algumas horas');
-        console.log('- Verifique se sua conexão com a internet está estável');
         
     } catch (error) {
-        console.error('💥 Erro durante a correção:', error.message);
+        log(`Erro durante as correções: ${error.message}`, 'error');
         process.exit(1);
     }
 }
 
-main();
+// Executar se chamado diretamente
+if (require.main === module) {
+    runAllFixes();
+}
+
+module.exports = { runAllFixes };
