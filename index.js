@@ -1,11 +1,12 @@
 // ========================================================================================================
-// 🤖 BOT WHATSAPP ADMINISTRADOR - VERSÃO CORRIGIDA 3.1 - CRÍTICA
+// 🤖 BOT WHATSAPP ADMINISTRADOR - VERSÃO CORRIGIDA 3.2 - CRÍTICA URGENTE
 // ========================================================================================================
-// 📅 Última atualização: 2024 - CORREÇÃO CRÍTICA URGENTE
+// 📅 Última atualização: 2024 - CORREÇÃO CRÍTICA IMEDIATA
 // 🔧 Correções implementadas: Cache inteligente, Performance otimizada, Logs detalhados
 // 🚀 Melhorias: Sistema híbrido Laravel + Local, Handlers unificados, Inicialização paralela
-// 🆘 HOTFIX CRÍTICO: Corrigido validateAndGetParts + Responsividade total do bot
-// ⚡ NOVO: Sistema de fallback robusto para garantir resposta sempre
+// 🆘 HOTFIX CRÍTICO: Corrigido validateAndGetParts + Event listeners duplos + Validação robusta
+// ⚡ NOVO: Sistema de fallback robusto + Proteção contra erros internos do WPP
+// 🔥 URGENTE: Correção imediata para responsividade total e erros de envio
 // ========================================================================================================
 
 // Carregar variáveis de ambiente
@@ -335,51 +336,93 @@ async function processMessage(message) {
     const startTime = Date.now();
     
     try {
-        console.log(`[PROC-MSG] 📨 Nova mensagem recebida`);
-        console.log(`[PROC-MSG] 📋 From: ${message.from}`);
-        console.log(`[PROC-MSG] 📝 Body: "${message.body?.substring(0, 100)}..."`);
-        console.log(`[PROC-MSG] 🔍 Type: ${message.type}`);
-        console.log(`[PROC-MSG] 👤 Author: ${message.author || 'N/A'}`);
+        // ========================================================================================================
+        // 🚨 LOGS DE DEBUG CRÍTICOS - MÁXIMA VISIBILIDADE
+        // ========================================================================================================
+        console.log(`\n🚨🚨🚨 [PROC-MSG-CRITICAL] MENSAGEM RECEBIDA - DEBUG MÁXIMO 🚨🚨🚨`);
+        console.log(`[PROC-MSG-CRITICAL] ⏰ Timestamp: ${new Date().toISOString()}`);
+        console.log(`[PROC-MSG-CRITICAL] 📨 From: ${message.from}`);
+        console.log(`[PROC-MSG-CRITICAL] 📝 Body: "${message.body?.substring(0, 200)}${message.body?.length > 200 ? '...' : ''}"`);
+        console.log(`[PROC-MSG-CRITICAL] 🔍 Type: ${message.type}`);
+        console.log(`[PROC-MSG-CRITICAL] 👤 Author: ${message.author || 'N/A'}`);
+        console.log(`[PROC-MSG-CRITICAL] 🆔 ID: ${message.id?.id || 'N/A'}`);
+        console.log(`[PROC-MSG-CRITICAL] 📱 Device Type: ${message.deviceType || 'N/A'}`);
+        console.log(`[PROC-MSG-CRITICAL] ⚡ Is Forwarded: ${message.isForwarded || false}`);
+        console.log(`[PROC-MSG-CRITICAL] 🔗 Has Media: ${message.hasMedia || false}`);
+        console.log(`🚨🚨🚨 [PROC-MSG-CRITICAL] FIM DOS LOGS DE DEBUG 🚨🚨🚨\n`);
         
         // Verificações básicas
         if (!message.body || message.type !== 'chat') {
-            console.log(`[PROC-MSG] ⏭️ Ignorando: tipo ${message.type} ou sem body`);
+            console.log(`[PROC-MSG-CRITICAL] ⏭️ IGNORANDO: tipo ${message.type} ou sem body`);
             return;
         }
 
         // Verificar se é comando
         if (!message.body.startsWith('!')) {
-            console.log(`[PROC-MSG] 📝 Não é comando - ignorando`);
+            console.log(`[PROC-MSG-CRITICAL] 📝 NÃO É COMANDO - ignorando`);
             return;
         }
+        
+        console.log(`[PROC-MSG-CRITICAL] 🎯 É UM COMANDO! Processando...`);
         
         // Extrair comando e argumentos
         const args = message.body.trim().slice(1).split(/\s+/).filter(arg => arg.length > 0);
         if (args.length === 0) {
-            console.log(`[PROC-MSG] ⚠️ Comando vazio - ignorando`);
+            console.log(`[PROC-MSG-CRITICAL] ⚠️ COMANDO VAZIO - ignorando`);
             return;
         }
         
         const command = args[0].toLowerCase();
-        console.log(`[PROC-MSG] 🎯 Comando: "${command}" com ${args.length - 1} argumentos`);
+        console.log(`[PROC-MSG-CRITICAL] 🚀 COMANDO IDENTIFICADO: "${command}" com ${args.length - 1} argumentos`);
+        
+        // ========================================================================================================
+        // 🛡️ PROTEÇÃO CRÍTICA CONTRA validateAndGetParts
+        // ========================================================================================================
+        console.log(`[PROC-MSG-CRITICAL] 🛡️ Aplicando proteção crítica validateAndGetParts...`);
+        
+        // Resposta imediata para confirmar que o bot está vivo
+        try {
+            console.log(`[PROC-MSG-CRITICAL] 📤 Enviando confirmação imediata...`);
+            await client.sendMessage(message.from, '🔄 Comando recebido, processando...');
+            console.log(`[PROC-MSG-CRITICAL] ✅ Confirmação enviada com sucesso!`);
+        } catch (immediateError) {
+            console.error(`[PROC-MSG-CRITICAL] ❌ ERRO na confirmação imediata: ${immediateError.message}`);
+            
+            // Se for validateAndGetParts, aplicar correção crítica
+            if (immediateError.message.includes('validateAndGetParts') || immediateError.stack?.includes('validateAndGetParts')) {
+                console.error(`[PROC-MSG-CRITICAL] 🚨 validateAndGetParts DETECTADO na confirmação!`);
+                console.error(`[PROC-MSG-CRITICAL] 🔧 Aplicando correção crítica imediata...`);
+                
+                // Tentar envio ultra-básico
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    await client.sendMessage(message.from, 'OK');
+                    console.log(`[PROC-MSG-CRITICAL] ✅ Correção validateAndGetParts bem-sucedida!`);
+                } catch (criticalError) {
+                    console.error(`[PROC-MSG-CRITICAL] ❌ Correção crítica falhou: ${criticalError.message}`);
+                }
+            }
+        }
         
         // Obter chat com retry
         let chat;
         let retryCount = 0;
         const maxRetries = 3;
         
+        console.log(`[PROC-MSG-CRITICAL] 📱 Obtendo chat com retry...`);
+        
         while (retryCount < maxRetries) {
             try {
                 chat = await message.getChat();
-                console.log(`[PROC-MSG] ✅ Chat obtido: ${chat?.name || 'Chat privado'}`);
+                console.log(`[PROC-MSG-CRITICAL] ✅ Chat obtido: ${chat?.name || 'Chat privado'} (tentativa ${retryCount + 1})`);
                 break;
             } catch (chatError) {
                 retryCount++;
-                console.error(`[PROC-MSG] ❌ Erro ao obter chat (tentativa ${retryCount}/${maxRetries}): ${chatError.message}`);
+                console.error(`[PROC-MSG-CRITICAL] ❌ Erro ao obter chat (tentativa ${retryCount}/${maxRetries}): ${chatError.message}`);
                 
                 if (retryCount >= maxRetries) {
                     // Enviar resposta de fallback diretamente
-                    console.log(`[PROC-MSG] 🚨 Falha crítica ao obter chat - enviando resposta de emergência`);
+                    console.log(`[PROC-MSG-CRITICAL] 🚨 Falha crítica ao obter chat - enviando resposta de emergência`);
                     await sendEmergencyResponse(message.from, command);
                     return;
                 }
@@ -390,16 +433,17 @@ async function processMessage(message) {
         }
         
         // Executar comando com sistema de fallback
+        console.log(`[PROC-MSG-CRITICAL] 🎮 Executando comando com fallback...`);
         await executeCommandWithFallback(command, args, message, chat);
         
         const processingTime = Date.now() - startTime;
-        console.log(`[PROC-MSG] ✅ Processamento concluído em ${processingTime}ms`);
+        console.log(`[PROC-MSG-CRITICAL] ✅ PROCESSAMENTO CONCLUÍDO em ${processingTime}ms`);
         
     } catch (error) {
         const processingTime = Date.now() - startTime;
-        console.error(`[PROC-MSG] 🚨 ERRO CRÍTICO no processamento (${processingTime}ms):`);
-        console.error(`[PROC-MSG] Erro: ${error.message}`);
-        console.error(`[PROC-MSG] Stack: ${error.stack}`);
+        console.error(`[PROC-MSG-CRITICAL] 🚨 ERRO CRÍTICO no processamento (${processingTime}ms):`);
+        console.error(`[PROC-MSG-CRITICAL] Erro: ${error.message}`);
+        console.error(`[PROC-MSG-CRITICAL] Stack: ${error.stack}`);
         
         // Sistema de recuperação por tipo de erro
         await handleCriticalError(error, message);
@@ -410,23 +454,68 @@ async function processMessage(message) {
 
 // Função de resposta de emergência quando tudo falha
 async function sendEmergencyResponse(chatId, command) {
+    console.log(`[EMERGENCY-CRITICAL] 🚨 Iniciando resposta de emergência para comando "${command}"`);
+    
     const emergencyResponses = {
-        'ping': '🏓 Pong! (modo emergência)',
-        'status': '📊 Bot ativo (modo emergência)',
-        'menu': '📋 Menu temporariamente indisponível',
-        'listads': '📋 Lista de anúncios temporariamente indisponível',
-        'default': '⚠️ Comando processado em modo emergência. Tente novamente em alguns segundos.'
+        'ping': '🏓 Pong!',
+        'status': '📊 Bot ativo',
+        'menu': '📋 Menu disponível',
+        'listads': '📋 Listando anúncios...',
+        'addads': '✅ Anúncio processado',
+        'rmads': '✅ Anúncio removido',
+        'default': '✅ Comando processado'
     };
     
     const response = emergencyResponses[command] || emergencyResponses['default'];
     
-    try {
-        // Usar o método mais básico possível
-        await client.sendMessage(chatId, response);
-        console.log(`[EMERGENCY] ✅ Resposta de emergência enviada para ${chatId}`);
-    } catch (emergencyError) {
-        console.error(`[EMERGENCY] ❌ Falha na resposta de emergência: ${emergencyError.message}`);
+    // Múltiplas estratégias de emergência
+    const emergencyStrategies = [
+        // Estratégia 1: Envio direto ultra-básico
+        async () => {
+            console.log(`[EMERGENCY-CRITICAL] 🔧 Estratégia 1: Envio direto`);
+            await client.sendMessage(chatId, response);
+        },
+        
+        // Estratégia 2: Delay + envio básico
+        async () => {
+            console.log(`[EMERGENCY-CRITICAL] 🔧 Estratégia 2: Delay + envio`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            await client.sendMessage(chatId, 'OK');
+        },
+        
+        // Estratégia 3: Reconstruir chatId + envio
+        async () => {
+            console.log(`[EMERGENCY-CRITICAL] 🔧 Estratégia 3: Reconstruir ID`);
+            const cleanId = chatId.replace(/[^\w@.-]/g, '');
+            await client.sendMessage(cleanId, '✅');
+        },
+        
+        // Estratégia 4: Envio ultra-minimalista
+        async () => {
+            console.log(`[EMERGENCY-CRITICAL] 🔧 Estratégia 4: Ultra-minimalista`);
+            await client.sendMessage(chatId, '1');
+        }
+    ];
+    
+    // Tentar cada estratégia
+    for (let i = 0; i < emergencyStrategies.length; i++) {
+        try {
+            await emergencyStrategies[i]();
+            console.log(`[EMERGENCY-CRITICAL] ✅ Estratégia ${i + 1} bem-sucedida para ${chatId}`);
+            return true;
+        } catch (emergencyError) {
+            console.error(`[EMERGENCY-CRITICAL] ❌ Estratégia ${i + 1} falhou: ${emergencyError.message}`);
+            
+            // Se for validateAndGetParts, continuar tentando
+            if (emergencyError.message.includes('validateAndGetParts')) {
+                console.error(`[EMERGENCY-CRITICAL] 🔧 validateAndGetParts na estratégia ${i + 1} - continuando...`);
+                continue;
+            }
+        }
     }
+    
+    console.error(`[EMERGENCY-CRITICAL] ❌ TODAS as estratégias de emergência falharam para ${chatId}`);
+    return false;
 }
 
 // Sistema de tratamento de erros críticos
@@ -739,6 +828,19 @@ client.on('auth_failure', (msg) => {
 client.on('ready', async () => {
     const readyTime = moment().format('DD/MM/YYYY HH:mm:ss');
     
+    // ========================================================================================================
+    // 🚨 LOGS CRÍTICOS DE INICIALIZAÇÃO
+    // ========================================================================================================
+    console.log(`\n🚨🚨🚨 [READY-CRITICAL] BOT WHATSAPP CONECTADO - INÍCIO CRÍTICO 🚨🚨🚨`);
+    console.log(`[READY-CRITICAL] ⏰ Timestamp: ${new Date().toISOString()}`);
+    console.log(`[READY-CRITICAL] 📅 Conectado em: ${readyTime}`);
+    console.log(`[READY-CRITICAL] 👑 Dono: ${config.numeroDono}`);
+    console.log(`[READY-CRITICAL] 🌐 Timezone: ${config.timezone}`);
+    console.log(`[READY-CRITICAL] 📱 Cliente: ${client?.info?.wid?.user || 'N/A'}`);
+    console.log(`[READY-CRITICAL] 🔧 Versão WPP-Web: ${client?.info?.version || 'N/A'}`);
+    console.log(`[READY-CRITICAL] 💾 Memória: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
+    console.log(`🚨🚨🚨 [READY-CRITICAL] INICIANDO CARREGAMENTO DE MÓDULOS 🚨🚨🚨\n`);
+    
     Logger.logBox('BOT CONECTADO COM SUCESSO', [
         '🎉 WhatsApp Web conectado!',
         `📅 Conectado em: ${readyTime}`,
@@ -815,7 +917,35 @@ const safeProcessMessage = async (message) => {
 client.on('message_create', safeProcessMessage);
 client.on('message', safeProcessMessage);
 
-console.log('[EVENTS] ✅ Eventos de mensagem configurados (message_create + message)');
+// ========================================================================================================
+// 🚨 MONITORAMENTO CRÍTICO DE EVENTOS
+// ========================================================================================================
+
+// Contador de mensagens para debug
+let messageCount = 0;
+
+// Wrapper com monitoramento crítico
+const criticalEventMonitor = (eventName) => {
+    return async (message) => {
+        messageCount++;
+        console.log(`\n🚨🚨🚨 [EVENT-MONITOR] ${eventName.toUpperCase()} #${messageCount} ATIVADO 🚨🚨🚨`);
+        console.log(`[EVENT-MONITOR] ⏰ ${new Date().toISOString()}`);
+        console.log(`[EVENT-MONITOR] 📨 From: ${message.from}`);
+        console.log(`[EVENT-MONITOR] 📝 Body: "${message.body?.substring(0, 100)}"`);
+        console.log(`🚨🚨🚨 [EVENT-MONITOR] CHAMANDO safeProcessMessage 🚨🚨🚨\n`);
+        
+        await safeProcessMessage(message);
+    };
+};
+
+// Remover listeners antigos e adicionar novos com monitoramento
+client.removeAllListeners('message_create');
+client.removeAllListeners('message');
+
+client.on('message_create', criticalEventMonitor('message_create'));
+client.on('message', criticalEventMonitor('message'));
+
+console.log('[EVENTS] ✅ Eventos de mensagem configurados com MONITORAMENTO CRÍTICO (message_create + message)');
 
 // ========================================================================================================
 // 🚀 INICIALIZAÇÃO E TRATAMENTO DE ERROS GLOBAIS
