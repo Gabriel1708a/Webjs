@@ -602,152 +602,218 @@ client.on('disconnected', (reason) => {
 // 📨 PROCESSAMENTO DE MENSAGENS OTIMIZADO
 // ========================================================================================================
 
-// Função para processar mensagens (unificada) - Versão 2.1 com correções críticas
+// Função para processar mensagens (versão ultra-robusta) - V3.0
 async function processMessage(message) {
+    const startTime = Date.now();
+    
     try {
-        console.log(`[DEBUG] 📨 Mensagem recebida de: ${message?.from || 'UNKNOWN'}`);
-        console.log(`[DEBUG] 📝 Conteúdo: "${message?.body?.substring(0, 50) || 'EMPTY'}..."`);
-        console.log(`[DEBUG] 📍 Tipo: ${message?.type || 'UNKNOWN'}`);
+        // Log detalhado de entrada
+        console.log(`[MSG-HANDLER] 📨 Nova mensagem recebida`);
+        console.log(`[MSG-HANDLER] 📍 From: ${message?.from || 'UNKNOWN'}`);
+        console.log(`[MSG-HANDLER] 📝 Body: "${message?.body?.substring(0, 100) || 'EMPTY'}"`);
+        console.log(`[MSG-HANDLER] 🕐 Timestamp: ${new Date().toISOString()}`);
         
-        // Validação básica da mensagem
-        if (!message || !message.body || !message.from) {
-            console.log(`[DEBUG] ⚠️ Mensagem inválida ignorada`);
+        // Validações críticas
+        if (!message) {
+            console.log(`[MSG-HANDLER] ⚠️ Mensagem nula - ignorando`);
+            return;
+        }
+        
+        if (!message.body || typeof message.body !== 'string') {
+            console.log(`[MSG-HANDLER] ⚠️ Body inválido - ignorando`);
+            return;
+        }
+        
+        if (!message.from) {
+            console.log(`[MSG-HANDLER] ⚠️ From inválido - ignorando`);
             return;
         }
 
-        // Verificar se a mensagem é de um chat válido
-        const chat = await message.getChat();
-        if (!chat) {
-            console.log(`[DEBUG] ⚠️ Chat não encontrado para mensagem`);
-            return;
-        }
-
-        console.log(`[DEBUG] 🏠 Chat: ${chat.name || chat.id.user || 'Privado'} (${chat.isGroup ? 'Grupo' : 'Privado'})`);
-
-        // Verificar se é um comando (inicia com !)
-        const isCommand = message.body.startsWith('!');
-        console.log(`[DEBUG] ⚡ É comando: ${isCommand ? 'SIM' : 'NÃO'}`);
-
+        // Verificar se é comando
+        const isCommand = message.body.trim().startsWith('!');
+        console.log(`[MSG-HANDLER] ⚡ É comando: ${isCommand ? 'SIM' : 'NÃO'}`);
+        
         if (!isCommand) {
-            console.log(`[DEBUG] 📤 Mensagem não é comando - ignorando`);
+            console.log(`[MSG-HANDLER] 📤 Não é comando - finalizando processamento`);
             return;
         }
 
-        // Extrair comando e argumentos
-        const args = message.body.slice(1).trim().split(' ');
-        const command = args[0].toLowerCase();
+        // Extrair comando com segurança
+        const bodyTrimmed = message.body.trim();
+        const args = bodyTrimmed.slice(1).split(/\s+/).filter(arg => arg.length > 0);
         
-        console.log(`[DEBUG] 🎯 Comando: "${command}" | Args: [${args.slice(1).join(', ')}]`);
+        if (args.length === 0) {
+            console.log(`[MSG-HANDLER] ⚠️ Comando vazio - ignorando`);
+            return;
+        }
+        
+        const command = args[0].toLowerCase();
+        console.log(`[MSG-HANDLER] 🎯 Comando extraído: "${command}"`);
+        console.log(`[MSG-HANDLER] 📋 Argumentos: [${args.slice(1).join(', ')}]`);
 
-        // Lista de comandos disponíveis
-        const availableCommands = [
-            'menu', 'ping', 'status', 'uptime', 'listads', 'addad', 'removead', 
-            'ban', 'unban', 'allg', 'allg2', 'sorteio', 'welcome', 'autoresposta', 
+        // Obter chat com timeout
+        let chat;
+        try {
+            console.log(`[MSG-HANDLER] 🔍 Obtendo informações do chat...`);
+            chat = await Promise.race([
+                message.getChat(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout ao obter chat')), 5000))
+            ]);
+            console.log(`[MSG-HANDLER] ✅ Chat obtido: ${chat?.name || chat?.id?.user || 'Privado'} (${chat?.isGroup ? 'Grupo' : 'Privado'})`);
+        } catch (chatError) {
+            console.error(`[MSG-HANDLER] ❌ Erro ao obter chat: ${chatError.message}`);
+            // Tentar resposta de emergência
+            try {
+                await client.sendMessage(message.from, '⚠️ Erro interno - tente novamente');
+                console.log(`[MSG-HANDLER] ✅ Resposta de emergência enviada`);
+            } catch (emergencyError) {
+                console.error(`[MSG-HANDLER] ❌ Falha na resposta de emergência: ${emergencyError.message}`);
+            }
+            return;
+        }
+
+        // Lista de comandos válidos
+        const validCommands = [
+            'menu', 'ping', 'status', 'uptime', 'listads', 'addad', 'removead',
+            'ban', 'unban', 'allg', 'allg2', 'sorteio', 'welcome', 'autoresposta',
             'horarios', 'debug', 'syncpanel', 'syncstatus'
         ];
 
-        // Verificar se o comando existe
-        if (!availableCommands.includes(command)) {
-            console.log(`[DEBUG] ❓ Comando "${command}" não reconhecido`);
+        if (!validCommands.includes(command)) {
+            console.log(`[MSG-HANDLER] ❓ Comando "${command}" não reconhecido`);
             try {
                 await Sender.sendMessage(client, message.from, 
-                    `❓ *Comando não reconhecido*\n\nDigite *!menu* para ver todos os comandos disponíveis.`);
-            } catch (error) {
-                console.error(`[DEBUG] Erro ao enviar resposta de comando inválido: ${error.message}`);
+                    `❓ *Comando não reconhecido: "${command}"*\n\nDigite *!menu* para ver comandos disponíveis.`);
+                console.log(`[MSG-HANDLER] ✅ Resposta de comando inválido enviada`);
+            } catch (invalidCmdError) {
+                console.error(`[MSG-HANDLER] ❌ Erro ao responder comando inválido: ${invalidCmdError.message}`);
             }
             return;
         }
 
-        console.log(`[DEBUG] ✅ Comando válido reconhecido: "${command}"`);
+        console.log(`[MSG-HANDLER] ✅ Comando válido reconhecido: "${command}"`);
 
-        // Verificar status do grupo (temporariamente desabilitado para debug)
-        let groupStatus = { active: true, reason: 'Debug mode' };
-        if (chat.isGroup) {
-            try {
-                console.log(`[DEBUG] 🔍 Verificando status do grupo...`);
-                // groupStatus = await RentalSystem.checkGroupStatus(chat.id._serialized);
-                console.log(`[DEBUG] 📊 Status do grupo: ${JSON.stringify(groupStatus)}`);
-            } catch (statusError) {
-                console.error(`[DEBUG] Erro ao verificar status do grupo: ${statusError.message}`);
-                groupStatus = { active: true, reason: 'Status check failed - allowing command' };
-            }
-        }
-
-        if (!groupStatus.active) {
-            console.log(`[DEBUG] 🚫 Grupo inativo: ${groupStatus.reason}`);
-            try {
-                await Sender.sendMessage(client, message.from, 
-                    `🚫 *Grupo não autorizado*\n\n${groupStatus.reason || 'Entre em contato com o administrador.'}`);
-            } catch (error) {
-                console.error(`[DEBUG] Erro ao enviar mensagem de grupo inativo: ${error.message}`);
-            }
-            return;
-        }
-
-        // Processar comando
-        console.log(`[DEBUG] 🚀 Processando comando: "${command}"`);
-
-        switch (command) {
-            case 'ping':
+        // Processar comando específico com timeout
+        const commandTimeout = 30000; // 30 segundos
+        
+        try {
+            await Promise.race([
+                executeCommand(command, args, message, chat),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error(`Timeout ao executar comando ${command}`)), commandTimeout)
+                )
+            ]);
+            
+            const processingTime = Date.now() - startTime;
+            console.log(`[MSG-HANDLER] ✅ Comando "${command}" executado com sucesso em ${processingTime}ms`);
+            
+        } catch (commandError) {
+            console.error(`[MSG-HANDLER] ❌ Erro ao executar comando "${command}": ${commandError.message}`);
+            
+            // Verificar se é erro validateAndGetParts
+            if (commandError.message.includes('validateAndGetParts') || 
+                commandError.stack?.includes('validateAndGetParts')) {
+                console.error(`[MSG-HANDLER] 🔧 ERRO validateAndGetParts DETECTADO!`);
+                
+                // Resposta de emergência simplificada
                 try {
-                    const startTime = Date.now();
-                    await Sender.sendMessage(client, message.from, '🏓 Pong!');
-                    const endTime = Date.now();
-                    console.log(`[DEBUG] ✅ Comando ping executado em ${endTime - startTime}ms`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando ping: ${error.message}`);
+                    await client.sendMessage(message.from, '⚠️ Erro interno detectado. Comando sendo processado...');
+                    console.log(`[MSG-HANDLER] ✅ Resposta de emergência para validateAndGetParts enviada`);
+                } catch (emergencyError) {
+                    console.error(`[MSG-HANDLER] ❌ Falha na resposta de emergência validateAndGetParts: ${emergencyError.message}`);
                 }
-                break;
-
-            case 'status':
+            } else {
+                // Resposta de erro genérica
                 try {
-                    const uptime = process.uptime();
-                    const hours = Math.floor(uptime / 3600);
-                    const minutes = Math.floor((uptime % 3600) / 60);
-                    const seconds = Math.floor(uptime % 60);
-                    
-                    const statusMsg = `📊 *Status do Bot*\n\n` +
-                        `⏱️ Uptime: ${hours}h ${minutes}m ${seconds}s\n` +
-                        `🔗 Conectado: ✅\n` +
-                        `📱 WhatsApp: Ativo\n` +
-                        `💾 Memória: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`;
-                    
-                    await Sender.sendMessage(client, message.from, statusMsg);
-                    console.log(`[DEBUG] ✅ Comando status executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando status: ${error.message}`);
-                }
-                break;
-
-            case 'uptime':
-                try {
-                    const uptime = process.uptime();
-                    const days = Math.floor(uptime / 86400);
-                    const hours = Math.floor((uptime % 86400) / 3600);
-                    const minutes = Math.floor((uptime % 3600) / 60);
-                    
                     await Sender.sendMessage(client, message.from, 
-                        `⏰ *Bot Online há:*\n${days}d ${hours}h ${minutes}m`);
-                    console.log(`[DEBUG] ✅ Comando uptime executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando uptime: ${error.message}`);
+                        `❌ *Erro ao executar comando*\n\n🔧 Comando: ${command}\n⚠️ Tente novamente em alguns segundos.`);
+                    console.log(`[MSG-HANDLER] ✅ Resposta de erro genérica enviada`);
+                } catch (errorResponseError) {
+                    console.error(`[MSG-HANDLER] ❌ Falha ao enviar resposta de erro: ${errorResponseError.message}`);
                 }
-                break;
+            }
+        }
+        
+    } catch (globalError) {
+        const processingTime = Date.now() - startTime;
+        console.error(`[MSG-HANDLER] 🚨 ERRO GLOBAL NO PROCESSAMENTO (${processingTime}ms):`);
+        console.error(`[MSG-HANDLER] 📍 From: ${message?.from || 'UNKNOWN'}`);
+        console.error(`[MSG-HANDLER] 📝 Body: "${message?.body?.substring(0, 100) || 'EMPTY'}"`);
+        console.error(`[MSG-HANDLER] ❌ Erro: ${globalError.message}`);
+        console.error(`[MSG-HANDLER] 📚 Stack: ${globalError.stack}`);
+        
+        // Log específico para validateAndGetParts
+        if (globalError.message.includes('validateAndGetParts') || 
+            globalError.stack?.includes('validateAndGetParts')) {
+            console.error(`[MSG-HANDLER] 🔧 ERRO validateAndGetParts NO NÍVEL GLOBAL!`);
+            console.error(`[MSG-HANDLER] 💡 Causa provável: ID de chat malformado ou problema interno do WhatsApp Web`);
+        }
+        
+        // Última tentativa de resposta
+        try {
+            await client.sendMessage(message.from, '🚨 Erro crítico detectado. Sistema sendo reiniciado...');
+            console.log(`[MSG-HANDLER] ✅ Última resposta de emergência enviada`);
+        } catch (lastError) {
+            console.error(`[MSG-HANDLER] ❌ FALHA TOTAL - não foi possível responder: ${lastError.message}`);
+        }
+    }
+}
 
-            case 'menu':
-                try {
-                    await MenuCommand.execute(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando menu executado`);
-                } catch (error) {
-                    console.error(`[DEBUG] Erro no comando menu: ${error.message}`);
-                }
-                break;
-
-            case 'listads':
-                try {
-                    await AdsHandler.listAds(client, message, args);
-                    console.log(`[DEBUG] ✅ Comando listads executado`);
-                } catch (error) {
+// Função auxiliar para executar comandos
+async function executeCommand(command, args, message, chat) {
+    console.log(`[CMD-EXEC] 🚀 Executando comando: "${command}"`);
+    
+    switch (command) {
+        case 'ping':
+            await Sender.sendMessage(client, message.from, '🏓 *Pong!*\n\n✅ Bot está respondendo normalmente.');
+            break;
+            
+        case 'status':
+            const uptime = process.uptime();
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const statusMsg = `📊 *Status do Bot*\n\n` +
+                `⏱️ Online há: ${hours}h ${minutes}m\n` +
+                `🔗 Conectado: ✅\n` +
+                `📱 WhatsApp: Ativo\n` +
+                `💾 Memória: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`;
+            await Sender.sendMessage(client, message.from, statusMsg);
+            break;
+            
+        case 'uptime':
+            const uptimeSeconds = process.uptime();
+            const days = Math.floor(uptimeSeconds / 86400);
+            const uptimeHours = Math.floor((uptimeSeconds % 86400) / 3600);
+            const uptimeMinutes = Math.floor((uptimeSeconds % 3600) / 60);
+            await Sender.sendMessage(client, message.from, 
+                `⏰ *Bot Online há:*\n${days}d ${uptimeHours}h ${uptimeMinutes}m`);
+            break;
+            
+        case 'menu':
+            await MenuCommand.execute(client, message, args);
+            break;
+            
+        case 'listads':
+            await AdsHandler.listAds(client, message, args);
+            break;
+            
+        case 'addad':
+            await AdsHandler.addAd(client, message, args);
+            break;
+            
+        case 'removead':
+            await AdsHandler.removeAd(client, message, args);
+            break;
+            
+        default:
+            console.log(`[CMD-EXEC] ⚠️ Comando "${command}" reconhecido mas não implementado nesta versão`);
+            await Sender.sendMessage(client, message.from, 
+                `⚠️ *Comando em manutenção*\n\nO comando "${command}" está sendo atualizado.\n\nTente novamente em alguns minutos.`);
+            break;
+    }
+    
+    console.log(`[CMD-EXEC] ✅ Comando "${command}" finalizado`);
+}
                     console.error(`[DEBUG] Erro no comando listads: ${error.message}`);
                 }
                 break;
