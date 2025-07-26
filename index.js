@@ -38,9 +38,6 @@ async function notificarPainelLaravel() {
 // Importar módulos de comandos (será feito após definir as classes)
 let welcomeHandler, banHandler, sorteioHandler, adsHandler, menuHandler, groupControlHandler, horariosHandler, autoRespostaHandler, syncStatusHandler, syncPanelHandler;
 
-// Importar handler de mensagens automáticas do Laravel
-const AutoMessageHandler = require('./handlers/AutoMessageHandler');
-
 // Importar módulo de envio centralizado
 const Sender = require('./Sender');
 
@@ -390,24 +387,23 @@ client.on('ready', async () => {
     
     Logger.info('Módulos de comandos carregados');
     
-    // Carregar sistemas automáticos
-    await adsHandler.loadAllAds(client);
+    // Carregar sistemas automáticos LOCAIS
+    await adsHandler.loadAllAds(client);  // Sistema principal de mensagens automáticas
     await groupControlHandler.loadSchedules(client);
     await horariosHandler.loadAutoHours(client);
     await loadNotifiedUsers(); // Carregar usuários já notificados
     
-    Logger.success('Sistemas automáticos inicializados');
+    Logger.success('Sistemas automáticos locais inicializados');
     
-    // Notificar painel Laravel
-    await notificarPainelLaravel();
+    // Notificação do painel Laravel desabilitada (usando apenas sistema local)
+    // await notificarPainelLaravel();
     
     // Inicializar módulo de envio centralizado
     Sender.initialize(client);
     Logger.success('Módulo de envio centralizado inicializado');
     
-    // Inicializar serviço de mensagens automáticas do Laravel
-    await AutoMessageHandler.initialize();
-    Logger.success('Serviço de mensagens automáticas inicializado');
+    // Sistema de mensagens automáticas usando AdsHandler local
+    Logger.success('Sistema de anúncios automáticos (AdsHandler) carregado');
     
     // Inicializar handler do painel para entrada em grupos
     PanelHandler.initialize();

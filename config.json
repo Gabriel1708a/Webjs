@@ -6,7 +6,7 @@
   "autoReconnect": true,
   "sessaoPersistente": true,
   "laravelApi": {
-    "enabled": true,
+    "enabled": false,
     "baseUrl": "https://painel.botwpp.tech/api",
     "token": "teste"
   },
